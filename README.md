@@ -1,84 +1,17 @@
-<p align="center">
-  <a href="https://example.com/">
-    <img src="https://via.placeholder.com/72" alt="Logo" width=72 height=72>
-  </a>
+# krate
 
-  <h3 align="center">Logo</h3>
+A new Flutter project.
 
-  <p align="center">
-    Short description
-    <br>
-    <a href="https://reponame/issues/new?template=bug.md">Report bug</a>
-    ·
-    <a href="https://reponame/issues/new?template=feature.md&labels=feature">Request feature</a>
-  </p>
-</p>
+## Getting Started
 
+This project is a starting point for a Flutter application.
 
-## Table of contents
+A few resources to get you started if this is your first Flutter project:
 
-- [Installation](#installation)
-- [Status](#status)
-- [What's included](#whats-included)
-- [Bugs and feature requests](#bugs-and-feature-requests)
-- [Contributing](#contributing)
-- [Creators](#creators)
-- [Thanks](#thanks)
-- [Copyright and license](#copyright-and-license)
+- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
+- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
+- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
 
-
-## Installation
-instructions
-
-## Status
-- timeline of activities
-
-## What's included
-
-Directory structure
-
-```text
-src/
-└── ui/
-    ├── uiTheme.kt
-    └── Colors.kt
-└── res/
-    ├── strings.xml
-    └── README.md
-```
-
-## Bugs and feature requests
-
-Have a bug or a feature request? Please first read the [issue guidelines](https://reponame/blob/master/CONTRIBUTING.md) and search for existing and closed issues. If your problem or idea is not addressed yet, [please open a new issue](https://reponame/issues/new).
-
-## Contributing
-
-Please read through our [contributing guidelines](https://reponame/blob/master/CONTRIBUTING.md). Included are directions for opening issues, coding standards, and notes on development.
-
-Moreover, all HTML and CSS should conform to the [Code Guide](https://github.com/mdo/code-guide), maintained by [Main author](https://github.com/usernamemainauthor).
-
-Editor preferences are available in the [editor config](https://reponame/blob/master/.editorconfig) for easy use in common text editors. Read more and download plugins at <https://editorconfig.org/>.
-
-## Creators
-
-
-**Elmer**
-
-- <https://gitlab.com/eclaveria>
-
-## Thanks
-
-Some Text
-
-## Copyright and license
-
-Code and documentation copyright 2023-2024 the authors. Code released under the [MIT License](https://reponame/blob/master/LICENSE).
-
-Enjoy :metal:
-
-
-
-[ci]: https://about.gitlab.com/gitlab-ci/
-[index.html]: https://gitlab.com/pages/plain-html/blob/master/public/index.html
-[userpages]: https://docs.gitlab.com/ce/user/project/pages/introduction.html#user-or-group-pages
-[projpages]: https://docs.gitlab.com/ce/user/project/pages/introduction.html#project-pages
+For help getting started with Flutter development, view the
+[online documentation](https://docs.flutter.dev/), which offers tutorials,
+samples, guidance on mobile development, and a full API reference.
