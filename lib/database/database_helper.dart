@@ -33,17 +33,23 @@ class DatabaseHelper {
         tmdbId INTEGER UNIQUE,
         contentType TEXT NOT NULL,
         title TEXT NOT NULL,
-        description TEXT NOT NULL,
+        originalTitle TEXT,
+        originalLanguage TEXT,
+        description TEXT,
         genres TEXT,
         releaseDate TEXT,
         posterPath TEXT,
         backdropPath TEXT,
-        localImagePath TEXT,
-        totalSeasons INTEGER,
-        totalEpisodes INTEGER,
+        localPosterPath TEXT,
+        localBackdropPath TEXT,
+        videoPath TEXT,
+        duration INTEGER,
+        totalSeasons INTEGER DEFAULT 0,
+        totalEpisodes INTEGER DEFAULT 0,
         isFavorite INTEGER DEFAULT 0,
-        createdAt TEXT NOT NULL,
-        updatedAt TEXT NOT NULL
+        status TEXT,
+        createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+        updatedAt TEXT NOT NULL DEFAULT (datetime('now'))
       )
     ''');
 
@@ -54,11 +60,14 @@ class DatabaseHelper {
         contentId INTEGER NOT NULL,
         seasonNumber INTEGER NOT NULL,
         episodeNumber INTEGER NOT NULL,
-        title TEXT NOT NULL,
+        title TEXT,
         description TEXT,
-        localVideoPath TEXT NOT NULL,
-        duration INTEGER,
+        videoPath TEXT,
+        duration INTEGER DEFAULT 0,
         airDate TEXT,
+        status TEXT DEFAULT 'pending',
+        createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+        updatedAt TEXT NOT NULL DEFAULT (datetime('now')),
         FOREIGN KEY(contentId) REFERENCES content(id) ON DELETE CASCADE,
         UNIQUE(contentId, seasonNumber, episodeNumber)
       )
@@ -69,10 +78,10 @@ class DatabaseHelper {
       CREATE TABLE watch_progress(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         contentId INTEGER NOT NULL,
-        episodeId INTEGER NOT NULL,
-        progressSeconds INTEGER NOT NULL,
-        isFinished INTEGER NOT NULL,
-        lastWatchedAt TEXT NOT NULL,
+        episodeId INTEGER,
+        progressSeconds INTEGER DEFAULT 0,
+        isFinished INTEGER DEFAULT 0,
+        lastWatchedAt TEXT NOT NULL DEFAULT (datetime('now')),
         FOREIGN KEY(contentId) REFERENCES content(id) ON DELETE CASCADE,
         FOREIGN KEY(episodeId) REFERENCES episodes(id) ON DELETE CASCADE,
         UNIQUE(contentId, episodeId)

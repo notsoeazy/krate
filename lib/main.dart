@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:krate/widgets/content_import_test.dart';
 
 import './theme.dart';
 import './screens/screens.dart';
@@ -11,7 +12,7 @@ void main() async {
   await dotenv.load(fileName: ".env");
 
   // runApp(const KrateApp());
-  runApp(MaterialApp(home: const TMDBTestWidget()));
+  runApp(MaterialApp(home: const ContentImportTest()));
 }
 
 class KrateApp extends StatelessWidget {

@@ -1,12 +1,6 @@
 import 'package:flutter/material.dart';
-import '../repository/content_repository.dart';
-import '../repository/episodes_repository.dart';
-import '../services/api/tmdb_services.dart';
-import '../models/app/content.dart';
-import '../models/app/episode_local.dart';
 
-import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart';
+import '../services/api/tmdb_service.dart';
 
 class TMDBTestWidget extends StatefulWidget {
   const TMDBTestWidget({Key? key}) : super(key: key);
@@ -16,99 +10,73 @@ class TMDBTestWidget extends StatefulWidget {
 }
 
 class _TMDBTestWidgetState extends State<TMDBTestWidget> {
-  final ContentRepository _contentRepo = ContentRepository();
-  final EpisodesRepository _episodesRepo = EpisodesRepository();
-  late final TMDBService _tmdbService;
-
+  final TMDBService _tmdbService = TMDBService();
   final TextEditingController _searchController = TextEditingController();
-
-  List<Content> _allContent = [];
-  Map<int, List<Episode>> _episodesByContent = {};
-
-  List<dynamic> _searchResults = [];
-  bool _loading = false;
+  List<Map<String, dynamic>> _searchResults = [];
+  // For expanded series: tmdbId -> {season_number: [episodes]}
+  Map<int, Map<int, List<Map<String, dynamic>>>> _seriesEpisodes = {};
+  Set<int> _expandedSeries = {};
   bool _searching = false;
-  String _selectedType = 'movie'; // movie or tv
-
-  @override
-  void initState() {
-    super.initState();
-    _tmdbService = TMDBService(_contentRepo, _episodesRepo);
-    _loadLocalData();
-    _printDbPath();
-  }
-
-Future<void> _printDbPath() async {
-    final databasesPath = await getDatabasesPath();
-    final fullPath = join(databasesPath, 'app_database.db');
-
-    print('📦 DATABASE DIRECTORY: $databasesPath');
-    print('📄 FULL DATABASE PATH: $fullPath');
-  }
-
-  Future<void> _loadLocalData() async {
-    final allContent = await _contentRepo.getAllContent();
-
-    final episodesMap = <int, List<Episode>>{};
-    for (var content in allContent) {
-      final eps = await _episodesRepo.getEpisodesByContentId(content.id!);
-      episodesMap[content.id!] = eps;
-    }
-
-    setState(() {
-      _allContent = allContent;
-      _episodesByContent = episodesMap;
-    });
-  }
+  String _selectedType = 'multi'; // multi, movie, or tv
 
   Future<void> _search() async {
     if (_searchController.text.isEmpty) return;
-
     setState(() {
       _searching = true;
       _searchResults = [];
     });
-
-    List<dynamic> results;
-
+    List<Map<String, dynamic>> results;
     if (_selectedType == 'movie') {
       results = await _tmdbService.searchMovies(_searchController.text);
-    } else {
+    } else if (_selectedType == 'tv') {
       results = await _tmdbService.searchSeries(_searchController.text);
+    } else {
+      results = await _tmdbService.searchMulti(_searchController.text);
+      // Filter out 'person' results, keep only movie and tv
+      results = results.where((item) => item['media_type'] == 'movie' || item['media_type'] == 'tv').toList();
     }
-
     setState(() {
       _searchResults = results;
       _searching = false;
+      _seriesEpisodes.clear();
+      _expandedSeries.clear();
     });
   }
 
-  Future<void> _saveItem(dynamic item) async {
-    setState(() => _loading = true);
-
-    if (_selectedType == 'movie') {
-      await _tmdbService.fetchAndSaveMovie(item['id']);
-    } else {
-      await _tmdbService.fetchAndSaveSeries(item['id']);
+  Future<void> _toggleExpandSeries(int tmdbId) async {
+    if (_expandedSeries.contains(tmdbId)) {
+      setState(() {
+        _expandedSeries.remove(tmdbId);
+      });
+      return;
     }
-
-    await _loadLocalData();
-
-    setState(() => _loading = false);
-  }
-
-  String _formatDate(DateTime? date) {
-    if (date == null) return 'N/A';
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    if (_seriesEpisodes.containsKey(tmdbId)) {
+      setState(() {
+        _expandedSeries.add(tmdbId);
+      });
+      return;
+    }
+    // Fetch seasons/episodes from TMDB
+    final details = await _tmdbService.getSeriesDetails(tmdbId);
+    final int numSeasons = details['number_of_seasons'] ?? 0;
+    Map<int, List<Map<String, dynamic>>> seasonMap = {};
+    for (int season = 1; season <= numSeasons; season++) {
+      final seasonDetails = await _tmdbService.getSeasonDetails(tmdbId, season);
+      final episodes = (seasonDetails['episodes'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      seasonMap[season] = episodes;
+    }
+    setState(() {
+      _seriesEpisodes[tmdbId] = seasonMap;
+      _expandedSeries.add(tmdbId);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('TMDB Search & Local Test')),
+      appBar: AppBar(title: const Text('TMDB API Search Test')),
       body: Column(
         children: [
-          // 🔎 SEARCH BAR
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(
@@ -120,12 +88,14 @@ Future<void> _printDbPath() async {
                       hintText: 'Search TMDB...',
                       border: OutlineInputBorder(),
                     ),
+                    onSubmitted: (_) => _search(),
                   ),
                 ),
                 const SizedBox(width: 8),
                 DropdownButton<String>(
                   value: _selectedType,
                   items: const [
+                    DropdownMenuItem(value: 'multi', child: Text('Multi')),
                     DropdownMenuItem(value: 'movie', child: Text('Movie')),
                     DropdownMenuItem(value: 'tv', child: Text('Series')),
                   ],
@@ -137,75 +107,92 @@ Future<void> _printDbPath() async {
               ],
             ),
           ),
-
-          if (_searching) const CircularProgressIndicator(),
-
-          // 🔎 SEARCH RESULTS
+          if (_searching) const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: CircularProgressIndicator(),
+          ),
           if (_searchResults.isNotEmpty)
             Expanded(
               child: ListView.builder(
                 itemCount: _searchResults.length,
                 itemBuilder: (context, index) {
                   final item = _searchResults[index];
-                  final content = _searchResults[index];
-
-                  return ListTile(
-                    title: Text(content.title),
-                    subtitle: Text('TMDB ID: ${content.tmdbId}'),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.download),
-                      onPressed: () => _saveItem(content),
+                  final title = item['title'] ?? item['name'] ?? '';
+                  final overview = item['overview'] ?? '';
+                  final posterPath = item['poster_path'];
+                  final backdropPath = item['backdrop_path'];
+                  final tmdbId = item['id'];
+                  final releaseDate = item['release_date'] ?? item['first_air_date'] ?? '';
+                  final imageBase = 'https://image.tmdb.org/t/p/w500';
+                  final isSeries = (item['media_type'] == 'tv') || (_selectedType == 'tv') || (item['name'] != null && item['title'] == null);
+                  final isExpanded = _expandedSeries.contains(tmdbId);
+                  return Card(
+                    margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: posterPath != null
+                              ? Image.network(imageBase + posterPath, width: 60, fit: BoxFit.cover)
+                              : const SizedBox(width: 60, child: Icon(Icons.image_not_supported)),
+                          title: Text(title),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (releaseDate.isNotEmpty) Text('Release: $releaseDate'),
+                              if (overview.isNotEmpty) Padding(
+                                padding: const EdgeInsets.only(top: 4.0),
+                                child: Text(overview, maxLines: 3, overflow: TextOverflow.ellipsis),
+                              ),
+                              if (backdropPath != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: Image.network(imageBase + backdropPath, height: 80, fit: BoxFit.cover),
+                                ),
+                            ],
+                          ),
+                          isThreeLine: true,
+                          trailing: Text('TMDB: $tmdbId'),
+                          onTap: isSeries
+                              ? () => _toggleExpandSeries(tmdbId)
+                              : null,
+                        ),
+                        if (isSeries && isExpanded)
+                          _seriesEpisodes[tmdbId] == null
+                              ? const Padding(
+                                  padding: EdgeInsets.all(8.0),
+                                  child: CircularProgressIndicator(),
+                                )
+                              : Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: _seriesEpisodes[tmdbId]!.entries.map((seasonEntry) {
+                                      final seasonNum = seasonEntry.key;
+                                      final episodes = seasonEntry.value;
+                                      return Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('Season $seasonNum', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                          ...episodes.map((ep) {
+                                            final epTitle = ep['name'] ?? '';
+                                            final epNum = ep['episode_number'] ?? '';
+                                            final epDuration = ep['runtime'] ?? ep['duration'] ?? '';
+                                            return Padding(
+                                              padding: const EdgeInsets.only(left: 8.0, top: 2.0, bottom: 2.0),
+                                              child: Text('Ep $epNum: $epTitle${epDuration != '' ? ' (${epDuration} min)' : ''}'),
+                                            );
+                                          }).toList(),
+                                        ],
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+                      ],
                     ),
                   );
                 },
               ),
             ),
-
-          const Divider(),
-
-          // 📦 LOCAL DATABASE CONTENT
-          Expanded(
-            child: ListView.builder(
-              itemCount: _allContent.length,
-              itemBuilder: (context, index) {
-                final content = _allContent[index];
-                final episodes = _episodesByContent[content.id!] ?? [];
-
-                return Card(
-                  margin: const EdgeInsets.all(8),
-                  child: ExpansionTile(
-                    title: Text(
-                      '${content.title} (${content.contentType})',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Text(
-                      'TMDB: ${content.tmdbId} | Episodes: ${episodes.length}',
-                    ),
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Text(content.description),
-                      ),
-                      if (episodes.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: episodes.map((ep) {
-                              return Text(
-                                'S${ep.seasonNumber}E${ep.episodeNumber}: ${ep.title} '
-                                '(${_formatDate(ep.airDate)}) '
-                                '${ep.duration != null ? '- ${ep.duration} min' : ''}',
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
         ],
       ),
     );

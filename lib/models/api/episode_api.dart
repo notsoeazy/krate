@@ -1,23 +1,32 @@
-class Episode {
+class EpisodeApi {
+  final int id;
+  final int seasonNumber;
   final int episodeNumber;
-  final String name;
-  final String overview;
+  final String? name;
+  final String? overview;
+  final int? runtime;
   final DateTime? airDate;
 
-  Episode({
+  EpisodeApi({
+    required this.id,
+    required this.seasonNumber,
     required this.episodeNumber,
-    required this.name,
-    required this.overview,
-    required this.airDate,
+    this.name,
+    this.overview,
+    this.runtime,
+    this.airDate,
   });
 
-  factory Episode.fromJson(Map<String, dynamic> json) {
-    return Episode(
-      episodeNumber: json['episode_number'],
-      name: json['name'],
-      overview: json['overview'] ?? '',
-      airDate: json['air_date'] != null && json['air_date'] != ''
-          ? DateTime.parse(json['air_date'])
+  factory EpisodeApi.fromMap(Map<String, dynamic> map) {
+    return EpisodeApi(
+      id: map['id'],
+      seasonNumber: map['season_number'],
+      episodeNumber: map['episode_number'],
+      name: map['name'],
+      overview: map['overview'],
+      runtime: map['runtime'],
+      airDate: map['air_date'] != null && map['air_date'].toString().isNotEmpty
+          ? DateTime.tryParse(map['air_date'])
           : null,
     );
   }
