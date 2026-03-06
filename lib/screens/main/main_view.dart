@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../screens.dart';
+import '../../widgets/import_progress_overlay.dart';
 
 class MainView extends StatefulWidget {
   const MainView({super.key});
@@ -15,13 +16,16 @@ class _MainViewState extends State<MainView> {
   final List<Widget> _screens = const [
     HomeScreen(),
     LibraryScreen(),
+    SearchImportScreen(),
     SettingsScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_currentIndex],
+      body: Stack(
+        children: [_screens[_currentIndex], const ImportProgressOverlay()],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {
@@ -39,6 +43,11 @@ class _MainViewState extends State<MainView> {
             icon: Icon(Icons.video_library_outlined),
             selectedIcon: Icon(Icons.video_library),
             label: "Library",
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.add_circle_outline),
+            selectedIcon: Icon(Icons.add_circle),
+            label: "Import",
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),

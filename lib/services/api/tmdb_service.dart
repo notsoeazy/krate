@@ -27,6 +27,9 @@ class TMDBService {
     return await _apiService.getRequest(url);
   }
 
+  Future<Map<String, dynamic>> getTVDetails(int tmdbId) =>
+      getSeriesDetails(tmdbId);
+
   Future<Map<String, dynamic>> getSeasonDetails(
     int tmdbId,
     int seasonNumber,
@@ -39,7 +42,7 @@ class TMDBService {
     final url = "$_baseUrl/search/multi?api_key=$_apiKey&query=$query";
     return await _apiService.getRequestList(url);
   }
-  
+
   // String getPosterUrl(String path) => "https://image.tmdb.org/t/p/w500$path";
 
   // String getBackdropUrl(String path) => "https://image.tmdb.org/t/p/w780$path";

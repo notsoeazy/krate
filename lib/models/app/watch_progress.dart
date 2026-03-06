@@ -1,16 +1,16 @@
 class WatchProgress {
   final int? id;
   final int contentId;
-  final int? episodeId; // null if it's a movie
-  final int progressSeconds; // in seconds
+  final int episodeId; // always set — movies have a single episode row
+  final int positionMs; // playback position in milliseconds (matches media_kit)
   final bool isFinished;
   final DateTime lastWatchedAt;
 
   WatchProgress({
     this.id,
     required this.contentId,
-    this.episodeId,
-    required this.progressSeconds,
+    required this.episodeId,
+    required this.positionMs,
     required this.isFinished,
     DateTime? lastWatchedAt,
   }) : lastWatchedAt = lastWatchedAt ?? DateTime.now();
@@ -20,7 +20,7 @@ class WatchProgress {
     return {
       'contentId': contentId,
       'episodeId': episodeId,
-      'progressSeconds': progressSeconds,
+      'positionMs': positionMs,
       'isFinished': isFinished ? 1 : 0,
       'lastWatchedAt': lastWatchedAt.toIso8601String(),
     };
@@ -31,10 +31,8 @@ class WatchProgress {
     return WatchProgress(
       id: map['id'] as int?,
       contentId: map['contentId'] as int,
-      episodeId: map['episodeId'] as int?,
-      progressSeconds: map['progressSeconds'] != null
-          ? map['progressSeconds'] as int
-          : 0,
+      episodeId: map['episodeId'] as int,
+      positionMs: (map['positionMs'] as int?) ?? 0,
       isFinished: map['isFinished'] == 1,
       lastWatchedAt: map['lastWatchedAt'] != null
           ? DateTime.parse(map['lastWatchedAt'])
@@ -45,25 +43,24 @@ class WatchProgress {
   // Factory for creating new progress entries
   factory WatchProgress.create({
     required int contentId,
-    int? episodeId,
-    int progressSeconds = 0,
+    required int episodeId,
+    int positionMs = 0,
     bool isFinished = false,
   }) {
     return WatchProgress(
       contentId: contentId,
       episodeId: episodeId,
-      progressSeconds: progressSeconds,
+      positionMs: positionMs,
       isFinished: isFinished,
       lastWatchedAt: DateTime.now(),
     );
   }
 
-  // Create a modified copy
   WatchProgress copyWith({
     int? id,
     int? contentId,
     int? episodeId,
-    int? progressSeconds,
+    int? positionMs,
     bool? isFinished,
     DateTime? lastWatchedAt,
   }) {
@@ -71,7 +68,7 @@ class WatchProgress {
       id: id ?? this.id,
       contentId: contentId ?? this.contentId,
       episodeId: episodeId ?? this.episodeId,
-      progressSeconds: progressSeconds ?? this.progressSeconds,
+      positionMs: positionMs ?? this.positionMs,
       isFinished: isFinished ?? this.isFinished,
       lastWatchedAt: lastWatchedAt ?? this.lastWatchedAt,
     );

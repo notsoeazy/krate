@@ -1,5 +1,22 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
+
+class KrateNetworkException implements Exception {
+  final String message;
+  final bool isTimeout;
+  final bool isNoInternet;
+
+  KrateNetworkException(
+    this.message, {
+    this.isTimeout = false,
+    this.isNoInternet = false,
+  });
+
+  @override
+  String toString() => message;
+}
 
 class ApiService {
   final Map<String, String> defaultHeaders = {
@@ -7,10 +24,14 @@ class ApiService {
     'Accept': 'application/json',
   };
 
+  static const Duration _timeout = Duration(seconds: 15);
+
   /// Generic GET request
   Future<Map<String, dynamic>> getRequest(String url) async {
     try {
-      final response = await http.get(Uri.parse(url), headers: defaultHeaders);
+      final response = await http
+          .get(Uri.parse(url), headers: defaultHeaders)
+          .timeout(_timeout);
 
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
@@ -24,9 +45,19 @@ class ApiService {
           'API Error: ${response.statusCode} ${response.reasonPhrase}',
         );
       }
+    } on SocketException {
+      throw KrateNetworkException(
+        'No internet connection. Please check your network settings.',
+        isNoInternet: true,
+      );
+    } on TimeoutException {
+      throw KrateNetworkException(
+        'Request timed out. The server took too long to respond.',
+        isTimeout: true,
+      );
     } catch (e) {
-      // You can add logging or retries here
-      rethrow;
+      if (e is KrateNetworkException) rethrow;
+      throw Exception('An unexpected error occurred: $e');
     }
   }
 

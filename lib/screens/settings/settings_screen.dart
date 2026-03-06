@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../widgets/widgets.dart';
-
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -10,10 +8,7 @@ class SettingsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 16,
-        title: Text(
-          "Settings",
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
+        title: Text("Settings", style: Theme.of(context).textTheme.titleLarge),
       ),
       body: Placeholder(),
     );

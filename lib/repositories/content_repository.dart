@@ -1,20 +1,23 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'package:krate/constants.dart';
 import 'package:krate/database/database_helper.dart';
 import 'package:krate/models/app/content.dart';
 
-class ContentRepository {
+class ContentRepository extends ChangeNotifier {
   final DatabaseHelper _dbHelper = DatabaseHelper();
 
   /// Insert new content or update if TMDB ID already exists
   Future<int> insertContent(Content content) async {
     final db = await _dbHelper.database;
-    return await db.insert(
+    final id = await db.insert(
       'content',
       content.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+    notifyListeners();
+    return id;
   }
 
   /// Update content by local ID
@@ -23,18 +26,22 @@ class ContentRepository {
       throw ArgumentError('Cannot update content without local ID');
     }
     final db = await _dbHelper.database;
-    return await db.update(
+    final count = await db.update(
       'content',
       {...content.toMap(), 'updatedAt': DateTime.now().toIso8601String()},
       where: 'id = ?',
       whereArgs: [content.id],
     );
+    notifyListeners();
+    return count;
   }
 
   /// Delete content by ID
   Future<int> deleteContent(int id) async {
     final db = await _dbHelper.database;
-    return await db.delete('content', where: 'id = ?', whereArgs: [id]);
+    final count = await db.delete('content', where: 'id = ?', whereArgs: [id]);
+    notifyListeners();
+    return count;
   }
 
   /// Get all content, optionally filtered by ContentType
@@ -64,6 +71,17 @@ class ContentRepository {
     return maps.isNotEmpty ? Content.fromMap(maps.first) : null;
   }
 
+  /// Check if content exists by TMDB ID
+  Future<bool> existsByTmdbId(int tmdbId) async {
+    final db = await _dbHelper.database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) FROM content WHERE tmdbId = ?',
+      [tmdbId],
+    );
+    final count = Sqflite.firstIntValue(result) ?? 0;
+    return count > 0;
+  }
+
   /// Get content by local ID
   Future<Content?> getById(int id) async {
     final db = await _dbHelper.database;
@@ -90,7 +108,7 @@ class ContentRepository {
   /// Toggle favorite status
   Future<int> toggleFavorite(int contentId, bool favorite) async {
     final db = await _dbHelper.database;
-    return await db.update(
+    final count = await db.update(
       'content',
       {
         'isFavorite': favorite ? 1 : 0,
@@ -99,6 +117,8 @@ class ContentRepository {
       where: 'id = ?',
       whereArgs: [contentId],
     );
+    notifyListeners();
+    return count;
   }
 
   /// Search content by title (case-insensitive)
