@@ -1,75 +1,66 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
-import 'package:krate/models/app/content.dart';
+import 'package:krate/core/constants.dart';
+import 'package:krate/services/tmdb_service.dart';
 
-/// Handles downloading and caching TMDB poster/backdrop images to custom storage.
-///
-/// Saved structure within the user-selected root:
-///   <krateDir>/.artwork/<sanitized_title>/...
+/// Downloads TMDB artwork (poster and backdrop) into a pod directory.
 class ArtworkService {
-  final Dio _dio = Dio();
+  final Dio _dio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 60),
+    ),
+  );
 
-  static const String _tmdbImageBaseUrl = 'https://image.tmdb.org/t/p';
-  static const String _posterSize = 'w500';
-  static const String _backdropSize = 'w780';
-
-  String getPosterUrl(String tmdbPath) =>
-      '$_tmdbImageBaseUrl/$_posterSize$tmdbPath';
-  String getBackdropUrl(String tmdbPath) =>
-      '$_tmdbImageBaseUrl/$_backdropSize$tmdbPath';
-
+  /// Downloads poster and backdrop for [content] into [podPath].
+  ///
+  /// Returns a record with the absolute paths to the saved files, or null
+  /// for each if the download failed or the path was not provided.
   Future<({String? posterPath, String? backdropPath})> downloadArtwork({
-    required Content content,
-    String? posterTmdbPath,
-    String? backdropTmdbPath,
-    required String targetDirectory,
+    required String? tmdbPosterPath,
+    required String? tmdbBackdropPath,
+    required String podPath,
   }) async {
+    final dir = Directory(podPath);
+    if (!await dir.exists()) await dir.create(recursive: true);
+
     final results = await Future.wait([
-      posterTmdbPath != null
-          ? _downloadImage(
-              url: getPosterUrl(posterTmdbPath),
-              targetDirectory: targetDirectory,
-              filename: '.poster.jpg',
+      tmdbPosterPath != null
+          ? _download(
+              TMDBService.posterUrl(tmdbPosterPath),
+              '$podPath/$kPosterFileName',
             )
           : Future.value(null),
-      backdropTmdbPath != null
-          ? _downloadImage(
-              url: getBackdropUrl(backdropTmdbPath),
-              targetDirectory: targetDirectory,
-              filename: '.backdrop.jpg',
+      tmdbBackdropPath != null
+          ? _download(
+              TMDBService.backdropUrl(tmdbBackdropPath),
+              '$podPath/$kBackdropFileName',
             )
           : Future.value(null),
     ]);
+
     return (posterPath: results[0], backdropPath: results[1]);
   }
 
-  Future<void> deleteArtwork(String targetDirectory) async {
+  Future<String?> _download(String url, String savePath) async {
     try {
-      final poster = File('$targetDirectory/.poster.jpg');
-      final backdrop = File('$targetDirectory/.backdrop.jpg');
-      if (await poster.exists()) await poster.delete();
-      if (await backdrop.exists()) await backdrop.delete();
-    } catch (_) {}
-  }
-
-  Future<String?> _downloadImage({
-    required String url,
-    required String targetDirectory,
-    required String filename,
-  }) async {
-    try {
-      final dir = Directory(targetDirectory);
-      if (!await dir.exists()) await dir.create(recursive: true);
-
-      final filePath = '$targetDirectory/$filename';
-      final file = File(filePath);
-
-      if (await file.exists()) return filePath;
-
-      await _dio.download(url, filePath);
-      return filePath;
+      final file = File(savePath);
+      if (await file.exists()) return savePath; // already downloaded
+      await _dio.download(url, savePath);
+      return savePath;
     } catch (_) {
       return null;
+    }
+  }
+
+  Future<void> deleteArtwork(String podPath) async {
+    for (final name in [kPosterFileName, kBackdropFileName]) {
+      final file = File('$podPath/$name');
+      if (await file.exists()) {
+        try {
+          await file.delete();
+        } catch (_) {}
+      }
     }
   }
 }

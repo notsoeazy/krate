@@ -1,29 +1,29 @@
 import 'dart:convert';
-import 'dart:io' hide ContentType;
-import 'package:krate/constants.dart';
-import 'package:krate/models/app/content.dart';
-import 'package:krate/models/app/episode.dart';
+import 'dart:io';
+import 'package:krate/core/constants.dart';
+import 'package:krate/core/errors.dart';
+import 'package:krate/data/models/content.dart';
+import 'package:krate/data/models/episode.dart';
 import 'package:path/path.dart' as p;
 
-/// Handles serialization of media metadata to/from `.metadata.json`.
+/// Handles reading and writing the `.metadata.json` scribe file.
 ///
-/// This is the core of the "Self-Scribed Library" architecture, allowing
-/// the filesystem to be the source of truth for the library.
+/// The scribe is the **source of truth** — if the SQLite DB is ever lost,
+/// the entire library can be rebuilt by scanning for these files.
 class MetadataService {
-  static const String metadataFileName = '.metadata.json';
-  static const int schemaVersion = 1;
-
-  /// Scribes (writes) metadata to a `.metadata.json` file in the given [directoryPath].
+  /// Writes (scribes) all content metadata to `<podPath>/.metadata.json`.
   ///
-  /// The [content] and [episodes] are converted to a portable JSON format
-  /// where all paths are relative to the [directoryPath].
-  Future<void> scribeMetadata({
+  /// All TMDB paths are preserved so that artwork can be re-downloaded later.
+  /// All episode video paths are stored as relative paths for portability.
+  Future<void> scribe({
     required Content content,
     required List<Episode> episodes,
-    required String directoryPath,
+    required String podPath,
   }) async {
-    final Map<String, dynamic> data = {
-      'version': schemaVersion,
+    final isMovie = content.contentType == ContentType.movie;
+
+    final data = <String, dynamic>{
+      'version': kMetadataSchemaVersion,
       'type': content.contentType.name,
       'tmdbId': content.tmdbId,
       'title': content.title,
@@ -36,23 +36,20 @@ class MetadataService {
       'runtime': content.runtime,
       'voteAverage': content.voteAverage,
       'voteCount': content.voteCount,
-      'status': content.status,
-      // Artwork paths are always standardized to hidden files in the pod root
-      'posterPath': '.poster.jpg',
-      'backdropPath': '.backdrop.jpg',
-      'hasFile': content.hasFile,
+      'tmdbStatus': content.tmdbStatus,
+      // Retain TMDB remote paths so artwork can be re-downloaded
+      'tmdbPosterPath': content.tmdbPosterPath,
+      'tmdbBackdropPath': content.tmdbBackdropPath,
+      // Standardised local names — always relative
+      'posterPath': kPosterFileName,
+      'backdropPath': kBackdropFileName,
+      'fileStatus': content.fileStatus.name,
     };
 
-    if (content.contentType != ContentType.movie) {
+    if (!isMovie) {
       data['totalSeasons'] = content.totalSeasons;
       data['totalEpisodes'] = content.totalEpisodes;
       data['episodes'] = episodes.map((e) {
-        // Calculate the relative path for the episode video file
-        String? relativeVideoPath;
-        if (e.videoPath != null) {
-          relativeVideoPath = p.relative(e.videoPath!, from: directoryPath);
-        }
-
         return {
           'season': e.seasonNumber,
           'episode': e.episodeNumber,
@@ -60,111 +57,118 @@ class MetadataService {
           'overview': e.description,
           'airDate': e.airDate?.toIso8601String(),
           'runtime': e.runtime,
-          'videoPath': relativeVideoPath,
-          'hasFile': e.hasFile,
+          'videoPath': e.videoPath != null
+              ? p.relative(e.videoPath!, from: podPath)
+              : null,
+          'fileStatus': e.fileStatus.name,
         };
       }).toList();
-    } else if (episodes.isNotEmpty) {
-      // For movies, we might still have a single episode object representing the movie file
-      final movieEpisode = episodes.first;
-      if (movieEpisode.videoPath != null) {
-        data['videoPath'] = p.relative(
-          movieEpisode.videoPath!,
-          from: directoryPath,
-        );
-      } else {
-        data['videoPath'] = null;
-      }
+    } else if (episodes.isNotEmpty && episodes.first.videoPath != null) {
+      data['videoPath'] = p.relative(episodes.first.videoPath!, from: podPath);
     }
 
-    final file = File(p.join(directoryPath, metadataFileName));
+    final file = File(p.join(podPath, kMetadataFileName));
     await file.writeAsString(const JsonEncoder.withIndent('  ').convert(data));
   }
 
-  /// Reads metadata from a `.metadata.json` file.
-  ///
-  /// Returns a Map containing the 'content' object and a list of 'episodes'.
-  /// Paths in the returned objects are absolute, converted using the [directoryPath].
-  Future<Map<String, dynamic>> readMetadata(String filePath) async {
-    final file = File(filePath);
+  /// Reads a `.metadata.json` file and returns reconstructed [Content] and
+  /// [Episode] objects with absolute paths. The [contentId] is a placeholder
+  /// (-1) since the DB has not been consulted yet.
+  Future<({Content content, List<Episode> episodes})> read(
+    String metadataFilePath,
+  ) async {
+    final file = File(metadataFilePath);
     if (!await file.exists()) {
-      throw FileSystemException('Metadata file not found', filePath);
+      throw MetadataParseException(metadataFilePath);
     }
 
-    final String contentString = await file.readAsString();
-    final Map<String, dynamic> data = jsonDecode(contentString);
-    final String directoryPath = p.dirname(filePath);
+    late Map<String, dynamic> data;
+    try {
+      data = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+    } catch (_) {
+      throw MetadataParseException(metadataFilePath);
+    }
 
-    final ContentType contentType = ContentType.values.firstWhere(
-      (e) => e.name == data['type'],
+    final podPath = p.dirname(metadataFilePath);
+    final now = DateTime.now();
+    final contentType = ContentType.values.firstWhere(
+      (e) => e.name == (data['type'] as String?),
       orElse: () => ContentType.movie,
     );
 
-    final now = DateTime.now();
-
-    final Content content = Content(
-      tmdbId: data['tmdbId'],
+    final content = Content(
+      tmdbId: data['tmdbId'] as int?,
       contentType: contentType,
-      title: data['title'] ?? 'Unknown',
-      originalTitle: data['originalTitle'],
-      originalLanguage: data['originalLanguage'],
-      tagline: data['tagline'],
-      description: data['overview'],
-      genres: data['genres'] != null ? List<String>.from(data['genres']) : null,
-      releaseDate: data['releaseDate'] != null
-          ? DateTime.tryParse(data['releaseDate'])
+      title: data['title'] as String? ?? 'Unknown',
+      originalTitle: data['originalTitle'] as String?,
+      originalLanguage: data['originalLanguage'] as String?,
+      tagline: data['tagline'] as String?,
+      description: data['overview'] as String?,
+      genres: data['genres'] != null
+          ? List<String>.from(data['genres'] as List)
           : null,
-      runtime: data['runtime'],
+      releaseDate: data['releaseDate'] != null
+          ? DateTime.tryParse(data['releaseDate'] as String)
+          : null,
+      runtime: data['runtime'] as int?,
+      totalSeasons: (data['totalSeasons'] as int?) ?? 0,
+      totalEpisodes: (data['totalEpisodes'] as int?) ?? 0,
       voteAverage: (data['voteAverage'] as num?)?.toDouble() ?? 0.0,
-      voteCount: data['voteCount'] ?? 0,
-      status: data['status'],
-      posterPath:
-          data['tmdbPosterPath'], // This field isn't in my scribe, might need to add it if we want it preserved
-      backdropPath: data['tmdbBackdropPath'],
+      voteCount: (data['voteCount'] as int?) ?? 0,
+      tmdbStatus: data['tmdbStatus'] as String?,
+      tmdbPosterPath: data['tmdbPosterPath'] as String?,
+      tmdbBackdropPath: data['tmdbBackdropPath'] as String?,
       localPosterPath: data['posterPath'] != null
-          ? p.join(directoryPath, data['posterPath'])
+          ? p.join(podPath, data['posterPath'] as String)
           : null,
       localBackdropPath: data['backdropPath'] != null
-          ? p.join(directoryPath, data['backdropPath'])
+          ? p.join(podPath, data['backdropPath'] as String)
           : null,
-      isFavorite: false, // UI state, not in metadata.json
-      hasFile: data['hasFile'] ?? false,
+      podPath: podPath,
+      fileStatus: FileStatus.values.firstWhere(
+        (e) => e.name == (data['fileStatus'] as String?),
+        orElse: () => FileStatus.missing,
+      ),
       createdAt: now,
       updatedAt: now,
     );
 
-    final List<Episode> episodes = [];
+    final episodes = <Episode>[];
 
     if (contentType == ContentType.movie) {
-      if (data['videoPath'] != null) {
-        episodes.add(
-          Episode.forMovie(
-            contentId: -1, // Placeholder
-            videoPath: p.join(directoryPath, data['videoPath']),
-            runtime: data['runtime'],
-          ).copyWith(hasFile: data['hasFile'] ?? true),
-        );
-      }
+      final relPath = data['videoPath'] as String?;
+      final absPath = relPath != null ? p.join(podPath, relPath) : null;
+      episodes.add(
+        Episode(
+          contentId: -1,
+          videoPath: absPath,
+          runtime: data['runtime'] as int?,
+          fileStatus: absPath != null ? FileStatus.missing : FileStatus.missing,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
     } else if (data['episodes'] != null) {
-      for (final episodeData in data['episodes']) {
-        String? absoluteVideoPath;
-        if (episodeData['videoPath'] != null) {
-          absoluteVideoPath = p.join(directoryPath, episodeData['videoPath']);
-        }
-
+      for (final ep in data['episodes'] as List) {
+        final epMap = ep as Map<String, dynamic>;
+        final relPath = epMap['videoPath'] as String?;
+        final absPath = relPath != null ? p.join(podPath, relPath) : null;
         episodes.add(
           Episode(
-            contentId: -1, // Placeholder
-            seasonNumber: episodeData['season'],
-            episodeNumber: episodeData['episode'],
-            title: episodeData['title'],
-            description: episodeData['overview'],
-            airDate: episodeData['airDate'] != null
-                ? DateTime.tryParse(episodeData['airDate'])
+            contentId: -1,
+            seasonNumber: epMap['season'] as int?,
+            episodeNumber: epMap['episode'] as int?,
+            title: epMap['title'] as String?,
+            description: epMap['overview'] as String?,
+            airDate: epMap['airDate'] != null
+                ? DateTime.tryParse(epMap['airDate'] as String)
                 : null,
-            runtime: episodeData['runtime'],
-            videoPath: absoluteVideoPath,
-            hasFile: episodeData['hasFile'] ?? false,
+            runtime: epMap['runtime'] as int?,
+            videoPath: absPath,
+            fileStatus: FileStatus.values.firstWhere(
+              (e) => e.name == (epMap['fileStatus'] as String?),
+              orElse: () => FileStatus.missing,
+            ),
             createdAt: now,
             updatedAt: now,
           ),
@@ -172,6 +176,6 @@ class MetadataService {
       }
     }
 
-    return {'content': content, 'episodes': episodes};
+    return (content: content, episodes: episodes);
   }
 }
