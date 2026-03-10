@@ -1,19 +1,35 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:krate/providers/providers.dart';
+import 'package:krate/ui/screens/home/home_screen.dart';
+import 'package:krate/ui/screens/library/library_screen.dart';
+import 'package:krate/ui/screens/recents/recents_screen.dart';
+import 'package:krate/ui/screens/settings/settings_screen.dart';
 import 'package:krate/ui/widgets/import_overlay.dart';
 
-class ShellScreen extends StatelessWidget {
-  final StatefulNavigationShell navigationShell;
+class ShellScreen extends ConsumerWidget {
+  const ShellScreen({super.key});
 
-  const ShellScreen({super.key, required this.navigationShell});
+  final List<Widget> _screens = const [
+    HomeScreen(),
+    LibraryScreen(),
+    RecentsScreen(),
+    SettingsScreen(),
+  ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentIndex = ref.watch(shellTabIndexProvider);
+
     return Scaffold(
-      body: ImportOverlay(child: navigationShell),
+      body: ImportOverlay(
+        child: IndexedStack(index: currentIndex, children: _screens),
+      ),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: (index) => navigationShell.goBranch(index),
+        selectedIndex: currentIndex,
+        onDestinationSelected: (index) {
+          ref.read(shellTabIndexProvider.notifier).state = index;
+        },
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),

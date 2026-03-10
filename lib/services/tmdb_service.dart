@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
-import 'package:krate/core/errors.dart';
+import 'package:krate/utils/errors.dart';
 
 /// Thin wrapper around the TMDB v3 REST API.
 class TMDBService {

@@ -1,5 +1,5 @@
 import 'package:sqflite/sqflite.dart';
-import 'package:krate/core/constants.dart';
+import 'package:krate/utils/constants.dart';
 import 'package:krate/data/database/app_database.dart';
 import 'package:krate/data/models/content.dart';
 

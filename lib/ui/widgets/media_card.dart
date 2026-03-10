@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:krate/core/constants.dart';
+import 'package:krate/utils/constants.dart';
 import 'package:krate/data/models/content.dart';
 
 class MediaCard extends StatelessWidget {

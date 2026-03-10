@@ -1,9 +1,8 @@
+import 'dart:async';
 import 'package:awesome_video_player/awesome_video_player.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:krate/core/constants.dart';
 import 'package:krate/data/models/episode.dart';
 import 'package:krate/data/models/watch_progress.dart';
 import 'package:krate/providers/providers.dart';
@@ -21,6 +20,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   BetterPlayerController? _controller;
   Episode? _episode;
   bool _isInitialized = false;
+  bool _hasSeeked = false;
+  Timer? _progressTimer;
 
   @override
   void initState() {
@@ -35,6 +36,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   void dispose() {
+    _progressTimer?.cancel();
     _saveProgress();
     _controller?.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -48,7 +50,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
     final ep = await epRepo.getById(widget.episodeId);
     if (ep == null || ep.videoPath == null) {
-      if (mounted) context.pop();
+      if (mounted) Navigator.of(context).pop();
       return;
     }
 
@@ -94,13 +96,29 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       betterPlayerDataSource: dataSource,
     );
 
-    if (progress != null && !progress.isFinished) {
-      _controller!.seekTo(Duration(milliseconds: progress.positionMs));
+    // Initial check in case it's already ready (local files)
+    if (_controller!.videoPlayerController?.value.initialized ?? false) {
+      _applySeek(progress);
     }
+
+    _controller!.addEventsListener((event) {
+      if (event.betterPlayerEventType == BetterPlayerEventType.initialized ||
+          event.betterPlayerEventType == BetterPlayerEventType.play) {
+        _applySeek(progress);
+      }
+    });
 
     if (mounted) {
       setState(() => _isInitialized = true);
+      _startProgressTimer();
     }
+  }
+
+  void _startProgressTimer() {
+    _progressTimer?.cancel();
+    _progressTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      _saveProgress();
+    });
   }
 
   Future<void> _saveProgress() async {
@@ -113,20 +131,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       return;
     }
 
-    final isFinished =
-        position.inMilliseconds >
-        (duration.inMilliseconds * kFinishedThreshold);
+    await ref
+        .read(watchProgressServiceProvider)
+        .saveProgress(
+          contentId: _episode!.contentId,
+          episodeId: _episode!.id!,
+          positionMs: position.inMilliseconds,
+          durationMs: duration.inMilliseconds,
+        );
+  }
 
-    final progress = WatchProgress(
-      contentId: _episode!.contentId,
-      episodeId: _episode!.id!,
-      positionMs: position.inMilliseconds,
-      durationMs: duration.inMilliseconds,
-      isFinished: isFinished,
-      lastWatchedAt: DateTime.now(),
-    );
-
-    await ref.read(watchProgressRepoProvider).save(progress);
+  void _applySeek(WatchProgress? progress) {
+    if (_hasSeeked || progress == null || progress.isFinished) return;
+    if (_controller?.videoPlayerController?.value.initialized ?? false) {
+      _hasSeeked = true;
+      _controller!.seekTo(Duration(milliseconds: progress.positionMs));
+    }
   }
 
   @override
@@ -151,7 +171,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 backgroundColor: Colors.black26,
                 child: IconButton(
                   icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => context.pop(),
+                  onPressed: () => Navigator.of(context).pop(),
                 ),
               ),
             ),

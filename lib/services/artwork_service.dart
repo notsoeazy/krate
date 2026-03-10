@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
-import 'package:krate/core/constants.dart';
+import 'package:krate/utils/constants.dart';
 import 'package:krate/services/tmdb_service.dart';
 
 /// Downloads TMDB artwork (poster and backdrop) into a pod directory.

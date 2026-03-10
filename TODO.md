@@ -1,5 +1,20 @@
 # Krate - To-Do List & Roadmap
 
+## MVP Features
+- [ ] **Media Management**: Refine the manage media feature to allow user to manage media files in the library.
+    - [ ] Delete media files.
+    - [ ] Link (move/copy) media files.
+    - [ ] Update UI & databse, handle missing flags when deleted.
+    - [ ] handle edge cases such as importinga and deleting at the same time.
+    
+- [ ] **Syncing**: Refine the syncing feature to allow user to sync their library with the krate_vault directory which will scan metadata.json and check for media files in the directory.
+    - [ ] Import content entry just by scanning the metadata.json file.
+    - [ ] Update database from metadata.json file.
+    - [ ] Automatically load episodes and show in the library.
+
+- [ ] **History**: Implement history tab.
+
+
 Below is the list of planned features, improvements, and fixes for the Krate media vault.
 
 ## Priority: High (Core Functionality)
@@ -29,8 +44,6 @@ Below is the list of planned features, improvements, and fixes for the Krate med
 - [ ] **Recommendations**: Show "Similar Movies" based on the current selection.
 - [ ] **Backup/Restore**: Export the database and artwork to a zip file for migration.
 - [ ] **External Player**: Option to open the video file in an external app like VLC or MX Player.
-- [ ] **Trakt/AniList Sync**: Automatically sync watch progress with online tracking services.
-- [ ] **Custom Playlists**: Allow users to group content into custom "Collections."
 
 
 ## Finished / Completed ✅
@@ -40,6 +53,3 @@ Below is the list of planned features, improvements, and fixes for the Krate med
 - [x] Premium Player with reactive controls, skip buttons, and skip gestures.
 - [x] Automatic watch progress saving and resume.
 
-## Issues / Bugs
-- [ ] The video player shows a second progress bar, likely the one from MediaKit. 
-- [ ] Fix the ratio of the posters and backdrop crop in library. 

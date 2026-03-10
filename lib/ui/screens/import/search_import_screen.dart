@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:krate/core/constants.dart';
+import 'package:krate/utils/constants.dart';
 import 'package:krate/providers/providers.dart';
+import 'package:krate/ui/screens/import/media_details_import_screen.dart';
 
 class SearchImportScreen extends ConsumerStatefulWidget {
   const SearchImportScreen({super.key});
@@ -15,10 +15,16 @@ class _SearchImportScreenState extends ConsumerState<SearchImportScreen> {
   final TextEditingController _controller = TextEditingController();
   List<Map<String, dynamic>> _results = [];
   bool _isLoading = false;
+  bool _isOffline = false;
+  bool _hasSearched = false;
 
   void _onSearch() async {
     if (_controller.text.isEmpty) return;
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _isOffline = false;
+      _hasSearched = true;
+    });
     try {
       final results = await ref
           .read(tmdbServiceProvider)
@@ -26,9 +32,18 @@ class _SearchImportScreenState extends ConsumerState<SearchImportScreen> {
       if (mounted) setState(() => _results = results);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Search failed: $e')));
+        // Check if it's a connectivity issue
+        final isOffline =
+            e.toString().toLowerCase().contains('socket') ||
+            e.toString().toLowerCase().contains('network') ||
+            e.toString().toLowerCase().contains('connection');
+        if (isOffline) {
+          setState(() => _isOffline = true);
+        } else {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Search failed: $e')));
+        }
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -57,11 +72,48 @@ class _SearchImportScreenState extends ConsumerState<SearchImportScreen> {
           ),
           if (_isLoading)
             const Expanded(child: Center(child: CircularProgressIndicator())),
-          if (!_isLoading && _results.isEmpty)
-            const Expanded(
-              child: Center(child: Text('Search TMDB for movies or TV series')),
+          if (!_isLoading && _isOffline)
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.wifi_off_outlined,
+                      size: 64,
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No internet connection',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Searching requires an internet connection.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
             ),
-          if (!_isLoading && _results.isNotEmpty)
+          if (!_isLoading && !_isOffline && _results.isEmpty)
+            Expanded(
+              child: Center(
+                child: Text(
+                  _hasSearched
+                      ? 'No results found'
+                      : 'Search TMDB for movies or TV series',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                ),
+              ),
+            ),
+          if (!_isLoading && !_isOffline && _results.isNotEmpty)
             Expanded(
               child: ListView.builder(
                 itemCount: _results.length,
@@ -87,8 +139,15 @@ class _SearchImportScreenState extends ConsumerState<SearchImportScreen> {
                     onTap: () {
                       final tmdbId = item['id'];
                       final isSeries = item['media_type'] == 'tv';
-                      context.push(
-                        '/import/details/$tmdbId?type=${isSeries ? 'series' : 'movie'}',
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => MediaDetailsImportScreen(
+                            tmdbId: tmdbId,
+                            type: isSeries
+                                ? ContentType.series
+                                : ContentType.movie,
+                          ),
+                        ),
                       );
                     },
                   );

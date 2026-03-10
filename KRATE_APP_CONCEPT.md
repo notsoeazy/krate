@@ -1,74 +1,387 @@
-# Krate — The Self-Scribed Media Vault
+# Krate — App Concept & Technical Reference
 
-Krate is a private, offline-first media manager and player designed for users who want complete control over their local film and series collections. Unlike traditional players that rely on a central, fragile database, Krate treats your filesystem as the source of truth, "scribing" metadata directly into your media folders.
-
----
-
-## 🚀 Key Features
-
-- **Self-Scribed Library**: Metadata and artwork are stored alongside your media files, making your library portable and resilient.
-- **Background Imports**: High-performance, concurrent media imports with real-time progress tracking via a persistent overlay.
-- **Smart Scanning**: Bidirectional reconciliation detects new additions and identifies "Ghost Records" (missing physical files).
-- **Universal Playback**: Powered by `awesome_video_player` (BetterPlayer fork), featuring subtitle delay adjustments, auto-resume, and hardware acceleration.
-- **Continue Watching**: Automatically tracks your progress across movies and series episodes.
-- **Privacy First**: Zero trackers. No account required. All data stays on your device.
+Krate is an offline-first, local media manager and player built with Flutter. It manages movies and TV series stored on your device. Metadata is fetched from TMDB, artwork is downloaded and stored locally, and all state is double-written to both a local SQLite database and a `.metadata.json` file inside each media pod — so the library is portable and resilient.
 
 ---
 
-## 🛠 How It Works
+## Architecture Overview
 
-### 1. The "Scribe" Import Flow
-When you import media, Krate performs a multi-step "Scribe" process:
-1. **Match**: Fetches high-quality metadata and artwork from TMDB.
-2. **Move**: Moves and renames the physical file into a clean, structured "Pod" folder inside the visible `krate_vault/` directory.
-3. **Scribe**: Creates a `.metadata.json` file inside the folder containing the item's "DNA".
-4. **Cache**: Indices the metadata into a local SQLite database for lightning-fast browsing.
-
-### 2. Managing Files
-Krate allows for deep integration with your filesystem:
-- **Visible Vault**: The `krate_vault/` folder is created at your chosen root, keeping your managed media organized and accessible.
-- **Edit/Replace**: Easily swap out a movie or episode file while preserving its metadata and watch progress.
-- **Reconciliation**: If you manually move or delete folders on your drive, Krate recognizes the change and marks the item's status accordingly (Ghost Records).
-
-### 3. File Structure
-Krate organizes your media into a predictable, portable hierarchy:
-
-```text
-<Selected Root>/
-└── krate_vault/
-    ├── movies/
-    │   └── Movie-Title_Year_TMDBID/
-    │       ├── Movie-Title.mp4
-    │       ├── .metadata.json    <-- The Source of Truth
-    │       ├── poster.jpg
-    │       └── backdrop.jpg
-    └── series/
-        └── Series-Title_Year_TMDBID/
-            ├── .metadata.json
-            ├── poster.jpg
-            ├── backdrop.jpg
-            └── Season_01/        <-- Subfolders for clean organization
-                └── Series-Title_S01E01.mp4
+```
+User ──► Riverpod Providers ──► Services ──► SQLite DB (cache)
+                                       └──► .metadata.json (source of truth)
+                                       └──► Filesystem (krate_vault/)
 ```
 
-### 4. Data Storage
-- **Filesystem**: The absolute source of truth. Metadata and local image paths are stored in `.metadata.json`.
-- **Database (SQLite)**: Acts as a high-performance cache. If the database is ever lost, the entire library can be rebuilt in seconds by scanning the `.metadata.json` files.
-- **Artwork**: Stored as standard JPG files within each media pod, ensuring posters are always available even if TMDB is offline.
+**State Management:** Riverpod (`flutter_riverpod`) with `FutureProvider`, `StateNotifier`, and `Provider` for dependency injection.
+
+**Navigation:** Standard Flutter `Navigator` (`Navigator.push`, `Navigator.pop`, `Navigator.popUntil`) with a custom persistent bottom-nav shell (`ShellScreen`). The app root is a plain `MaterialApp` — no GoRouter. The vault status check in `main.dart` decides whether to show `ShellScreen` or `StorageSetupScreen`.
+
+**Database:** `sqflite` — singleton `AppDatabase`. 4 tables: `content`, `episodes`, `watch_progress`, `watch_history`.
+
+**Metadata file:** `.metadata.json` inside each pod directory — if the DB is wiped, the entire library can be rebuilt by scanning these files via `ScannerService`.
 
 ---
 
-## 🏗 Architecture
+## Vault Directory Structure
 
-Krate is built with a focus on modularity and performance:
+The vault lives inside a user-selected root folder (persisted via `SharedPreferences`):
 
-- **Frontend**: Flutter (3.x) with a custom Material 3 "Violet-Dark" design system.
-- **State Management**: `Riverpod` for robust, reactive UI updates and dependency injection.
-- **Navigation**: `GoRouter` for declarative, link-friendly routing with persistent shell navigation.
-- **Video Engine**: `awesome_video_player` (BetterPlayer-based), providing advanced subtitle control and auto-resume.
-- **Database**: `sqflite` for fast querying, filtering, and "Continue Watching" logic.
-- **Services**:
-  - `ScannerService`: Reconciles the filesystem and DB.
-  - `ImportService`: Manages concurrent background file operations and metadata scribing.
-  - `TMDBService`: Handles all interaction with the TMDB metadata API.
-  - `StorageService`: Manages the user-defined vault location and integrity.
+```
+<user-selected root>/
+└── krate_vault/
+    ├── movies/
+    │   └── Movie-Title_Year_TMDBID/          ← "Pod" folder
+    │       ├── .metadata.json                 ← Source of truth
+    │       ├── poster.jpg
+    │       ├── backdrop.jpg
+    │       └── Movie-Title.mp4               ← Renamed from source
+    └── series/
+        └── Series-Title_Year_TMDBID/          ← Pod folder
+            ├── .metadata.json                 ← Source of truth (all episodes inside)
+            ├── poster.jpg
+            ├── backdrop.jpg
+            └── Season_01/
+                ├── Series-Title_S01E01.mkv
+                └── Series-Title_S01E02.mkv
+```
+
+Pod folder naming is handled by `StorageService.ensurePodDir()`:
+- Pattern: `slugified-title_year_tmdbId`
+- Episode files: `slugified-title_S01E01.ext` inside `Season_NN/` subdirectories
+
+---
+
+## The `.metadata.json` File
+
+Written (or overwritten) by `MetadataService.scribe()` after every import, link, re-link, delete, or rescan operation. It captures the full state of the pod.
+
+**Schema (movies):**
+```json
+{
+  "version": 1,
+  "type": "movie",
+  "tmdbId": 12345,
+  "title": "Movie Title",
+  "originalTitle": "...",
+  "originalLanguage": "en",
+  "tagline": "...",
+  "overview": "...",
+  "genres": ["Action", "Drama"],
+  "releaseDate": "2023-06-15T00:00:00.000",
+  "runtime": 120,
+  "voteAverage": 7.8,
+  "voteCount": 3200,
+  "tmdbStatus": "Released",
+  "tmdbPosterPath": "/remote/path.jpg",
+  "tmdbBackdropPath": "/remote/backdrop.jpg",
+  "posterPath": "poster.jpg",
+  "backdropPath": "backdrop.jpg",
+  "fileStatus": "ready",
+  "videoPath": "Movie-Title.mp4"
+}
+```
+
+**Schema (series)** — same header fields, plus:
+```json
+{
+  "totalSeasons": 3,
+  "totalEpisodes": 36,
+  "episodes": [
+    {
+      "season": 1,
+      "episode": 1,
+      "title": "Pilot",
+      "overview": "...",
+      "airDate": "2021-01-10T00:00:00.000",
+      "runtime": 45,
+      "videoPath": "Season_01/Series-Title_S01E01.mkv",
+      "fileStatus": "ready"
+    }
+  ]
+}
+```
+
+> **Note:** `videoPath` inside episodes is stored as a **relative path** from the pod folder. When `MetadataService.read()` reconstructs Episode objects, it joins the relative path with the pod's absolute path to produce the full absolute path used at runtime.
+
+> **Note:** `tmdbPosterPath` / `tmdbBackdropPath` retain the original TMDB remote paths so artwork can be re-downloaded at any time. The local `posterPath` / `backdropPath` are always the standardised filenames `poster.jpg` and `backdrop.jpg`.
+
+---
+
+## Database Schema
+
+Stored in the OS app-data directory (`getDatabasesPath()`). Acts as a **read cache** — the filesystem is authoritative.
+
+### `content` table
+| Column | Type | Notes |
+|---|---|---|
+| `id` | INTEGER PK | Auto-incremented local ID |
+| `tmdbId` | INTEGER UNIQUE | TMDB identifier, used to look up and de-duplicate |
+| `contentType` | TEXT | `'movie'` or `'series'` |
+| `title` | TEXT | |
+| `genres` | TEXT | JSON-encoded string array |
+| `releaseDate` | TEXT | ISO 8601 |
+| `runtime` | INTEGER | Minutes. For series: average episode runtime |
+| `totalSeasons` | INTEGER | Series only |
+| `totalEpisodes` | INTEGER | Series only |
+| `tmdbPosterPath` | TEXT | Remote TMDB path, kept for re-download |
+| `tmdbBackdropPath` | TEXT | Remote TMDB path |
+| `localPosterPath` | TEXT | Absolute path to `poster.jpg` in pod |
+| `localBackdropPath` | TEXT | Absolute path to `backdrop.jpg` in pod |
+| `podPath` | TEXT | Absolute path to the pod directory |
+| `isFavorite` | INTEGER | 0 or 1 |
+| `fileStatus` | TEXT | `'ready'` or `'missing'` |
+
+### `episodes` table
+| Column | Type | Notes |
+|---|---|---|
+| `id` | INTEGER PK | |
+| `contentId` | INTEGER FK | References `content(id)` with CASCADE delete |
+| `seasonNumber` | INTEGER | `NULL` for movies |
+| `episodeNumber` | INTEGER | `NULL` for movies |
+| `title` | TEXT | Episode name from TMDB |
+| `runtime` | INTEGER | Minutes |
+| `videoPath` | TEXT | Absolute path to video file on disk |
+| `subtitlePath` | TEXT | Absolute path to subtitle file (`.srt`/`.ass`) |
+| `subtitleDelayMs` | INTEGER | Subtitle delay offset in milliseconds |
+| `fileStatus` | TEXT | `'ready'` or `'missing'` |
+
+> Movies get a single episode row with `seasonNumber = NULL`, `episodeNumber = NULL`. This unifies playback logic across both content types.
+
+### `watch_progress` table
+One row per episode. Upserted every time the player saves position.
+
+| Column | Type | Notes |
+|---|---|---|
+| `episodeId` | INTEGER UNIQUE FK | |
+| `contentId` | INTEGER FK | Denormalized for fast `getInProgress` queries |
+| `positionMs` | INTEGER | Playback position in milliseconds |
+| `durationMs` | INTEGER | Total duration in milliseconds |
+| `isFinished` | INTEGER | 1 if position ≥ 90% of duration |
+| `lastWatchedAt` | TEXT | ISO 8601, used for "Continue Watching" ordering |
+
+### `watch_history` table
+Append-only log. One row inserted per viewing session when the player closes.
+
+| Column | Type | Notes |
+|---|---|---|
+| `contentId` | INTEGER FK | |
+| `episodeId` | INTEGER FK | |
+| `startedAt` | TEXT | Session start time |
+| `finishedAt` | TEXT | Session end time |
+| `durationWatchedMs` | INTEGER | Total milliseconds watched in that session |
+
+---
+
+## Import Flow: Scouting & Linking
+
+The import pipeline is split into two explicit phases — **Scouting** (requires internet) and **Linking** (offline-capable).
+
+### Phase 1: Scouting (Search & Preview)
+
+**Screen:** `SearchImportScreen` → `MediaDetailsImportScreen`
+
+1. **User searches** for a movie or TV series by name. `TMDBService.searchMulti()` queries the TMDB `search/multi` endpoint and returns a combined list of movies and TV shows.
+2. **User taps a result.** The app navigates to `MediaDetailsImportScreen`, passing the `tmdbId` and `ContentType`.
+3. `MediaDetailsImportScreen.initState()` immediately calls `TMDBService.getMovieDetails()` or `TMDBService.getSeriesDetails()` and builds a temporary `Content` object from the raw TMDB response using `Content.fromTmdbMovie()` / `Content.fromTmdbSeries()`.
+4. The screen renders a preview card: poster (loaded from TMDB CDN), title, year, type, and overview.
+
+---
+
+### Phase 2a: Movie Import
+
+**Screens:** `MediaDetailsImportScreen`
+
+1. User taps **"Pick File"** on `MediaDetailsImportScreen`. `FilePicker.platform.pickFiles(type: FileType.video)` is called. A `BusyOverlay` is shown during picker access.
+2. The selected file path is displayed as confirmation.
+3. User taps **"Import Movie"**. The screen calls `ImportJobsNotifier.importMovie()`, which runs `ImportService.scoutMovie()` as a non-blocking background job.
+4. The screen immediately pops back to Home (`Navigator.popUntil(isFirst)`).
+
+**`ImportService.scoutMovie()` steps:**
+
+```
+[1] StorageService.ensurePodDir()     → creates <vault>/movies/Title_Year_ID/
+[2] StorageService.movieFilePath()    → computes dest path: <pod>/Movie-Title.ext
+[3] _moveFile(src, dest)              → tries rename() first; falls back to
+                                         chunk-copy + delete (for cross-volume moves)
+[4] ArtworkService.downloadArtwork() → downloads poster.jpg + backdrop.jpg into pod
+[5] ContentRepository.getByTmdbId()  → checks if already in DB (re-import scenario)
+    - if found: ContentRepository.update()
+    - if new:   ContentRepository.insert()
+[6] EpisodeRepository.insert()        → creates the single movie Episode row
+[7] MetadataService.scribe()          → writes .metadata.json to pod
+[8] Job status → ImportJobStatus.done → triggers library refresh via Riverpod invalidation
+```
+
+Progress is reported from 0.0 → 1.0 via `OnJobUpdate` callback, displayed in a persistent overlay managed by `ImportJobsNotifier`.
+
+---
+
+### Phase 2b: Series Import
+
+**Screens:** `MediaDetailsImportScreen` → `SeriesEpisodePickerScreen`
+
+1. On `MediaDetailsImportScreen`, tapping **"Select Episodes"** navigates to `SeriesEpisodePickerScreen` (passing `tmdbId`).
+2. `SeriesEpisodePickerScreen.initState()` loads the series from the local DB (if it exists) or TMDB, then fetches all season details from TMDB (`TMDBService.getSeasonDetails()` per season) to build the full episode list.
+3. Episodes are displayed grouped by season in collapsible `ExpansionTile` sections. The first season is expanded by default.
+4. User taps a **file icon** on any episode row. `FilePicker` opens for that specific episode, a `BusyOverlay` shows during picker access, and the selected path is stored in a local `Map<String, String>` keyed as `"S{season}E{episode}"`.
+5. A **Refresh** button in the AppBar can re-sync the episode list from TMDB without clearing selected files.
+6. Once files are selected, a **"Import N Episodes"** button appears at the bottom.
+7. Tapping **Import** calls `ImportJobsNotifier.importSeries()`, pops to Home, and runs in the background.
+
+**`ImportService.scoutSeries()` steps:**
+
+```
+[1]  StorageService.ensurePodDir()          → creates <vault>/series/Title_Year_ID/
+[2]  ArtworkService.downloadArtwork()       → downloads poster.jpg + backdrop.jpg
+[3]  ContentRepository.upsert()             → insert or update Content row in DB
+[4]  For each season (1..totalSeasons):
+         TMDBService.getSeasonDetails()     → fetches full episode list from TMDB
+         For each episode in TMDB list:
+             EpisodeRepository.upsert()     → inserts/updates Episode row in DB
+                                              (preserves existing videoPath & fileStatus)
+[5]  For each user-selected file:
+         StorageService.episodeFilePath()   → computes dest: <pod>/Season_NN/Title_SxxExx.ext
+         _moveFile(src, dest)               → move/copy file into vault
+         EpisodeRepository.update()         → sets videoPath + fileStatus = 'ready'
+[6]  _syncContentStatus()                   → sets Content.fileStatus to 'ready'
+                                              if at least one episode has a file
+[7]  MetadataService.scribe()               → writes full .metadata.json (all episodes)
+[8]  Job → done → library providers invalidated
+```
+
+---
+
+### Phase 3: Linking (Adding Files to Existing Series Episodes)
+
+**Screens:** `MediaManagementScreen` → `SeriesEpisodePickerScreen`
+
+After a series is already scouted (metadata exists, artwork downloaded), the user can link individual episode files at any time — no internet required.
+
+1. From **MediaManagementScreen**, the user can tap any episode row with `ManagedTileMode.manage` to pick a file for that episode.
+2. Alternatively, a batch link can be triggered which calls `ImportJobsNotifier.linkEpisodes()`.
+
+**`ImportService.linkEpisodes()` steps:**
+
+```
+[1] For each { episodeId → filePath } pair:
+        EpisodeRepository.getById(episodeId)    → fetch Episode from DB
+        StorageService.episodeFilePath()         → compute destination path
+        _moveFile(src, dest)                     → move file into vault
+        EpisodeRepository.update()               → set videoPath + fileStatus = 'ready'
+[2] _syncContentStatus()                         → update Content.fileStatus
+[3] MetadataService.scribe()                     → rewrite .metadata.json
+```
+
+**Re-linking a single episode** (`ImportService.relinkEpisode()`):
+- Moves the new file into the vault at the same target path.
+- Updates the episode's `videoPath` in the DB.
+- Deletes the old file if the path changed.
+- Calls `_syncContentStatus()` and `MetadataService.scribe()`.
+
+---
+
+## Deletion Flow
+
+### Delete a Content Entry (entire movie or series)
+`ImportService.deleteContent(content, deleteFiles: bool)`:
+- If `deleteFiles = true`: deletes the entire pod directory recursively.
+- Calls `ContentRepository.delete(contentId)`.
+- Due to `ON DELETE CASCADE` in the DB schema, all related `episodes`, `watch_progress`, and `watch_history` rows are automatically removed.
+
+### Delete a Single Episode File
+`ImportService.deleteEpisodeFile(content, episode)`:
+1. Deletes the physical file from disk (if it exists).
+2. `EpisodeRepository.update()` — sets `videoPath = null`, `fileStatus = 'missing'`.
+3. `_syncContentStatus()` — re-evaluates Content's `fileStatus`.
+4. `MetadataService.scribe()` — rewrites `.metadata.json` with updated state.
+
+### Batch Delete Episode Files
+`ImportService.deleteEpisodesBatch(content, episodes)`:
+- Iterates the episode list, deleting each file and clearing each DB row.
+- One final `_syncContentStatus()` + `MetadataService.scribe()` call after all deletions.
+
+---
+
+## Scanner / Reconciliation Flow
+
+**Service:** `ScannerService.scan()`
+
+Triggered manually by the user (e.g., a "Sync Vault" action). Used to reconcile the filesystem with the database — useful after manually moving files or recovering from a lost database.
+
+```
+[1] Walk <vault>/movies/ and <vault>/series/ to collect all pod directories
+[2] For each pod directory:
+        Check for .metadata.json — skip if missing
+        MetadataService.read()         → reconstruct Content + Episode list from JSON
+        ContentRepository.getByTmdbId → check if already in DB
+        ContentRepository.upsert()     → preserve isFavorite & createdAt; update rest
+        EpisodeRepository.upsert()     → add or update each episode row
+[3] Compare all Content.tmdbId values in DB against found tmdbIds on disk
+        Any DB entry not found on disk → flagged (ghost detection — pod directory missing)
+```
+
+**Ghost Records:** A content item whose pod directory no longer exists on disk. Its `fileStatus` is `'missing'` and the UI can surface a badge indicating the physical files are gone.
+
+---
+
+## Playback & Watch Progress Flow
+
+**Screen:** `PlayerScreen` (wraps `awesome_video_player` / BetterPlayer-based engine)
+
+### Launching Playback
+- From `MediaDetailsScreen`, the **Play** / **Continue Watching** button uses `resumeEpisodeProvider` to resolve which episode to play.
+- `WatchProgressService.getResumeEpisode(contentId)` determines the best episode using this priority:
+  1. Most recently watched in-progress (unfinished) episode with `fileStatus = ready`.
+  2. Next episode after the most recently finished one.
+  3. First `ready` episode in the content.
+
+### Saving Progress
+- The player periodically calls `WatchProgressService.saveProgress()`.
+- `WatchProgress` is upserted to the `watch_progress` table (one row per episode, keyed by `episodeId`).
+- An episode is marked `isFinished = true` when `position / duration ≥ 0.9` (90% watched).
+- After saving, Riverpod invalidates `continueWatchingProvider`, `resumeEpisodeProvider`, and `watchProgressProvider` so the Home screen and details screens reflect the latest progress immediately.
+
+### Continue Watching
+- `continueWatchingProvider` queries `WatchProgressRepository.getInProgressContent()` — returns `Content` items with at least one in-progress episode, ordered by `lastWatchedAt` descending.
+
+---
+
+## Storage Setup Flow
+
+On first launch (or if the vault root is missing/unavailable), the app shows `StorageSetupScreen` instead of the main shell.
+
+`StorageService.checkIntegrity()` is called via `vaultStatusProvider` at startup and returns one of:
+- `VaultStatus.ok` — root exists, write access confirmed, vault structure intact.
+- `VaultStatus.rootMissing` — no root configured or directory was deleted.
+- `VaultStatus.noPermission` — Android storage permission not granted.
+
+On Android, the app checks for both `Permission.storage` and `Permission.manageExternalStorage` (Android 11+ all-files access).
+
+---
+
+## `fileStatus` State Machine
+
+Both `content` and `episodes` rows carry a `fileStatus` field:
+
+```
+missing ──► ready     (after link/import)
+ready   ──► missing   (after file deletion or manual removal)
+```
+
+`_syncContentStatus()` is the internal method that keeps the parent `Content.fileStatus` in sync with its episodes:
+- If **at least one** episode is `ready` → Content is `ready`.
+- If **all** episodes are `missing` → Content is `missing` (ghost).
+
+---
+
+## Key Services Reference
+
+| Service | Responsibility |
+|---|---|
+| `ImportService` | Orchestrates scout, link, relink, delete operations. Writes DB + metadata. |
+| `MetadataService` | Reads and writes `.metadata.json` for each pod. |
+| `StorageService` | Manages the vault root, pod/season directory creation, and file path conventions. |
+| `ArtworkService` | Downloads poster and backdrop from TMDB CDN into the pod. |
+| `TMDBService` | Wraps TMDB REST API: `searchMulti`, `getMovieDetails`, `getSeriesDetails`, `getSeasonDetails`. |
+| `ScannerService` | Reconciles filesystem against DB by reading `.metadata.json` files. |
+| `WatchProgressService` | Determines resume episode; saves/upserts watch progress; invalidates Riverpod providers. |

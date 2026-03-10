@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:krate/core/constants.dart';
+import 'package:krate/utils/constants.dart';
 
 /// Represents a single piece of media content (movie or series).
 ///

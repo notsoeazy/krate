@@ -1,4 +1,4 @@
-import 'package:krate/core/constants.dart';
+import 'package:krate/utils/constants.dart';
 
 /// Represents a single playable episode within a [Content] item.
 ///
@@ -137,6 +137,11 @@ class Episode {
   bool get isMovie => seasonNumber == null;
   bool get hasFile => fileStatus == FileStatus.ready;
 
+  /// Returns a copy of this Episode with the given fields replaced.
+  ///
+  /// To explicitly clear a nullable String field (e.g. after deleting a file),
+  /// pass the corresponding `clear*` flag as `true`. The `??` pattern on
+  /// nullable params means passing `null` is a no-op without these flags.
   Episode copyWith({
     int? id,
     int? contentId,
@@ -147,7 +152,9 @@ class Episode {
     int? runtime,
     DateTime? airDate,
     String? videoPath,
+    bool clearVideoPath = false,
     String? subtitlePath,
+    bool clearSubtitlePath = false,
     int? subtitleDelayMs,
     FileStatus? fileStatus,
     DateTime? createdAt,
@@ -162,8 +169,10 @@ class Episode {
       description: description ?? this.description,
       runtime: runtime ?? this.runtime,
       airDate: airDate ?? this.airDate,
-      videoPath: videoPath ?? this.videoPath,
-      subtitlePath: subtitlePath ?? this.subtitlePath,
+      videoPath: clearVideoPath ? null : (videoPath ?? this.videoPath),
+      subtitlePath: clearSubtitlePath
+          ? null
+          : (subtitlePath ?? this.subtitlePath),
       subtitleDelayMs: subtitleDelayMs ?? this.subtitleDelayMs,
       fileStatus: fileStatus ?? this.fileStatus,
       createdAt: createdAt ?? this.createdAt,

@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:krate/core/constants.dart';
-import 'package:krate/core/errors.dart';
+import 'package:krate/utils/constants.dart';
+import 'package:krate/utils/errors.dart';
 import 'package:krate/data/models/content.dart';
 import 'package:krate/data/models/episode.dart';
 import 'package:path/path.dart' as p;

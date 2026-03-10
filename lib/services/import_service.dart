@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:krate/core/constants.dart';
-import 'package:krate/core/errors.dart';
+import 'package:krate/utils/constants.dart';
+import 'package:krate/utils/errors.dart';
 import 'package:krate/data/models/content.dart';
 import 'package:krate/data/models/episode.dart';
 import 'package:krate/data/models/import_job.dart';
@@ -13,14 +13,12 @@ import 'package:krate/services/storage_service.dart';
 import 'package:krate/services/tmdb_service.dart';
 import 'package:uuid/uuid.dart';
 
-/// Callback used to report import progress updates.
+/// Callback used to report job progress updates.
 typedef OnJobUpdate = void Function(ImportJob job);
 
-/// Orchestrates the full "Scribe" import flow.
-///
-/// Each import is independent — multiple movies or episodes can be imported
-/// concurrently. Progress is reported via the [OnJobUpdate] callback, which
-/// the Riverpod [ImportJobsNotifier] wires up.
+/// Orchestrates all Krate data operations:
+/// - **Scouting**: fetch TMDB metadata, download artwork, scribe DB + metadata (requires internet)
+/// - **Linking**: pick local media files and move them into the Vault (offline-capable)
 class ImportService {
   final ContentRepository _contentRepo;
   final EpisodeRepository _episodeRepo;
@@ -44,10 +42,10 @@ class ImportService {
        _tmdbService = tmdbService;
 
   // ---------------------------------------------------------------------------
-  // Movie import
+  // Scouting — downloads TMDB metadata & artwork (requires internet)
   // ---------------------------------------------------------------------------
 
-  Future<void> importMovie({
+  Future<void> scoutMovie({
     required Content content,
     required String sourceFilePath,
     required OnJobUpdate onUpdate,
@@ -65,11 +63,9 @@ class ImportService {
     onUpdate(job.copyWith(currentStep: 'Preparing...', progress: 0.0));
 
     try {
-      // 1. Ensure pod directory
       final podPath = await _storageService.ensurePodDir(content);
       onUpdate(job.copyWith(currentStep: 'Moving file...', progress: 0.1));
 
-      // 2. Move/copy video file
       final destPath = await _storageService.movieFilePath(
         content,
         podPath,
@@ -81,7 +77,6 @@ class ImportService {
         onProgress: (p) => onUpdate(job.copyWith(progress: 0.1 + p * 0.6)),
       );
 
-      // 3. Download artwork
       onUpdate(
         job.copyWith(currentStep: 'Downloading artwork...', progress: 0.7),
       );
@@ -91,7 +86,6 @@ class ImportService {
         podPath: podPath,
       );
 
-      // 4. Upsert DB records
       onUpdate(
         job.copyWith(currentStep: 'Saving to library...', progress: 0.85),
       );
@@ -125,7 +119,6 @@ class ImportService {
         await _episodeRepo.insert(movieEp);
       }
 
-      // 5. Scribe metadata.json
       onUpdate(
         job.copyWith(currentStep: 'Scribing metadata...', progress: 0.95),
       );
@@ -151,13 +144,10 @@ class ImportService {
   }
 
   // ---------------------------------------------------------------------------
-  // Series import
+  // Series scouting
   // ---------------------------------------------------------------------------
 
-  /// Imports multiple episodes for a series.
-  ///
-  /// [episodeFiles] maps season → episode → source file path.
-  Future<void> importSeries({
+  Future<void> scoutSeries({
     required Content content,
     required Map<int, Map<int, String>> episodeFiles,
     required OnJobUpdate onUpdate,
@@ -177,7 +167,6 @@ class ImportService {
     try {
       final podPath = await _storageService.ensurePodDir(content);
 
-      // Download artwork first
       onUpdate(
         job.copyWith(currentStep: 'Downloading artwork...', progress: 0.05),
       );
@@ -191,10 +180,9 @@ class ImportService {
         localPosterPath: artwork.posterPath,
         localBackdropPath: artwork.backdropPath,
         podPath: podPath,
-        fileStatus: FileStatus.ready,
+        fileStatus: FileStatus.missing,
       );
 
-      // Upsert content record
       final existing = await _contentRepo.getByTmdbId(content.tmdbId!);
       final int contentId;
       if (existing != null) {
@@ -206,11 +194,9 @@ class ImportService {
         );
       }
 
-      // 3. Pre-populate all episodes for all seasons (Offline-first)
       onUpdate(
         job.copyWith(currentStep: 'Registering episodes...', progress: 0.1),
       );
-      final List<Episode> allSeasonsEpisodes = [];
       for (int s = 1; s <= content.totalSeasons; s++) {
         try {
           final seasonData = await _tmdbService.getSeasonDetails(
@@ -221,26 +207,23 @@ class ImportService {
           for (final eData in epList) {
             final epData = eData as Map<String, dynamic>;
             final epNum = epData['episode_number'] as int? ?? 0;
-
-            final existing = await _episodeRepo.getSeriesEpisode(
+            final existingEp = await _episodeRepo.getSeriesEpisode(
               contentId,
               s,
               epNum,
             );
-            if (existing == null) {
-              final ep = Episode.fromTmdbEpisode(epData, contentId);
-              await _episodeRepo.insert(ep);
-              allSeasonsEpisodes.add(ep);
+            if (existingEp == null) {
+              await _episodeRepo.insert(
+                Episode.fromTmdbEpisode(epData, contentId),
+              );
             } else {
-              // Update metadata if it changed (cloud side)
-              final updated = Episode.fromTmdbEpisode(epData, contentId)
-                  .copyWith(
-                    id: existing.id,
-                    videoPath: existing.videoPath,
-                    fileStatus: existing.fileStatus,
-                  );
-              await _episodeRepo.update(updated);
-              allSeasonsEpisodes.add(updated);
+              await _episodeRepo.update(
+                Episode.fromTmdbEpisode(epData, contentId).copyWith(
+                  id: existingEp.id,
+                  videoPath: existingEp.videoPath,
+                  fileStatus: existingEp.fileStatus,
+                ),
+              );
             }
           }
         } catch (e) {
@@ -248,38 +231,17 @@ class ImportService {
         }
       }
 
-      // 4. Import files
-      // Count total files for progress reporting
       final totalFiles = episodeFiles.values.fold<int>(
         0,
         (sum, m) => sum + m.length,
       );
       int filesDone = 0;
 
-      final importedEpisodes = <Episode>[];
-
       for (final seasonEntry in episodeFiles.entries) {
         final season = seasonEntry.key;
-
-        // Fetch TMDB episode metadata for this season
-        Map<int, Map<String, dynamic>> tmdbEpMap = {};
-        try {
-          final seasonData = await _tmdbService.getSeasonDetails(
-            content.tmdbId!,
-            season,
-          );
-          final epList = (seasonData['episodes'] as List?) ?? [];
-          for (final e in epList) {
-            final ep = e as Map<String, dynamic>;
-            final num = ep['episode_number'] as int? ?? 0;
-            tmdbEpMap[num] = ep;
-          }
-        } catch (_) {}
-
         for (final epEntry in seasonEntry.value.entries) {
           final epNum = epEntry.key;
           final srcPath = epEntry.value;
-
           final destPath = await _storageService.episodeFilePath(
             content,
             podPath,
@@ -303,41 +265,25 @@ class ImportService {
               }
             },
           );
-
           filesDone++;
 
-          final tmdbData = tmdbEpMap[epNum];
-          final Episode ep;
-          if (tmdbData != null) {
-            ep = Episode.fromTmdbEpisode(
-              tmdbData,
-              contentId,
-            ).copyWith(videoPath: destPath, fileStatus: FileStatus.ready);
-          } else {
-            ep = Episode(
-              contentId: contentId,
-              seasonNumber: season,
-              episodeNumber: epNum,
-              videoPath: destPath,
-              fileStatus: FileStatus.ready,
-              createdAt: DateTime.now(),
-              updatedAt: DateTime.now(),
-            );
-          }
-
-          final existing = await _episodeRepo.getSeriesEpisode(
+          final existingEp = await _episodeRepo.getSeriesEpisode(
             contentId,
             season,
             epNum,
           );
-          if (existing != null) {
-            await _episodeRepo.update(ep.copyWith(id: existing.id));
-          } else {
-            await _episodeRepo.insert(ep);
+          if (existingEp != null) {
+            await _episodeRepo.update(
+              existingEp.copyWith(
+                videoPath: destPath,
+                fileStatus: FileStatus.ready,
+              ),
+            );
           }
-          importedEpisodes.add(ep);
         }
       }
+
+      await _syncContentStatus(contentId);
 
       onUpdate(
         job.copyWith(currentStep: 'Scribing metadata...', progress: 0.95),
@@ -365,26 +311,216 @@ class ImportService {
   }
 
   // ---------------------------------------------------------------------------
-  // File replacement
+  // Rescan — refreshes TMDB metadata for existing content (requires internet)
   // ---------------------------------------------------------------------------
 
-  /// Replaces the video file for an existing episode, without losing metadata.
-  Future<void> replaceEpisodeFile({
+  /// Updates an already-scouted series with the latest TMDB metadata.
+  /// Preserves existing [videoPath] and [fileStatus] per episode.
+  /// Throws [NoInternetException] when offline.
+  Future<void> rescanSeries({
+    required Content content,
+    required OnJobUpdate onUpdate,
+  }) async {
+    if (content.tmdbId == null) throw const TmdbIdRequiredException();
+    if (!await _hasInternet()) throw const NoInternetException();
+    if (content.podPath == null) return;
+
+    final job = ImportJob(
+      id: const Uuid().v4(),
+      title: 'Rescanning ${content.title}',
+      contentType: ContentType.series,
+      status: ImportJobStatus.running,
+      startedAt: DateTime.now(),
+    );
+
+    onUpdate(
+      job.copyWith(currentStep: 'Fetching latest data...', progress: 0.0),
+    );
+
+    try {
+      final seriesData = await _tmdbService.getSeriesDetails(content.tmdbId!);
+      final updatedContent = Content.fromTmdbSeries(seriesData).copyWith(
+        id: content.id,
+        localPosterPath: content.localPosterPath,
+        localBackdropPath: content.localBackdropPath,
+        podPath: content.podPath,
+        fileStatus: content.fileStatus,
+      );
+      await _contentRepo.update(updatedContent);
+
+      onUpdate(
+        job.copyWith(currentStep: 'Updating episodes...', progress: 0.3),
+      );
+
+      int processedSeasons = 0;
+      for (int s = 1; s <= updatedContent.totalSeasons; s++) {
+        try {
+          final seasonData = await _tmdbService.getSeasonDetails(
+            content.tmdbId!,
+            s,
+          );
+          final epList = (seasonData['episodes'] as List?) ?? [];
+          for (final eData in epList) {
+            final epData = eData as Map<String, dynamic>;
+            final epNum = epData['episode_number'] as int? ?? 0;
+            final existing = await _episodeRepo.getSeriesEpisode(
+              content.id!,
+              s,
+              epNum,
+            );
+            final updated = Episode.fromTmdbEpisode(epData, content.id!);
+            if (existing == null) {
+              await _episodeRepo.insert(updated);
+            } else {
+              // Preserve file linking data
+              await _episodeRepo.update(
+                updated.copyWith(
+                  id: existing.id,
+                  videoPath: existing.videoPath,
+                  fileStatus: existing.fileStatus,
+                ),
+              );
+            }
+          }
+        } catch (e) {
+          debugPrint('[ImportService] Rescan: error fetching season $s: $e');
+        }
+        processedSeasons++;
+        onUpdate(
+          job.copyWith(
+            currentStep: 'Season $s updated',
+            progress:
+                0.3 + (processedSeasons / updatedContent.totalSeasons) * 0.6,
+          ),
+        );
+      }
+
+      onUpdate(
+        job.copyWith(currentStep: 'Scribing metadata...', progress: 0.95),
+      );
+      final allEps = await _episodeRepo.getByContentId(content.id!);
+      await _metadataService.scribe(
+        content: updatedContent,
+        episodes: allEps,
+        podPath: content.podPath!,
+      );
+
+      onUpdate(
+        job.copyWith(
+          status: ImportJobStatus.done,
+          progress: 1.0,
+          currentStep: 'Done',
+        ),
+      );
+    } catch (e, st) {
+      debugPrint('[ImportService] Rescan failed: $e\n$st');
+      onUpdate(
+        job.copyWith(status: ImportJobStatus.error, error: e.toString()),
+      );
+      rethrow;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Linking — moves local media into the Vault (offline-capable)
+  // ---------------------------------------------------------------------------
+
+  /// Links (moves) multiple local media files to existing series episodes.
+  Future<void> linkEpisodes({
+    required Content content,
+    required Map<int, String> episodeFiles, // episodeId -> filePath
+    required OnJobUpdate onUpdate,
+  }) async {
+    if (content.podPath == null) return;
+
+    final job = ImportJob(
+      id: const Uuid().v4(),
+      title: 'Linking files for ${content.title}',
+      contentType: ContentType.series,
+      status: ImportJobStatus.running,
+      startedAt: DateTime.now(),
+    );
+
+    onUpdate(job.copyWith(currentStep: 'Preparing...', progress: 0.0));
+
+    try {
+      final podPath = content.podPath!;
+      final totalFiles = episodeFiles.length;
+      int filesDone = 0;
+
+      for (final entry in episodeFiles.entries) {
+        final episodeId = entry.key;
+        final srcPath = entry.value;
+
+        final episode = await _episodeRepo.getById(episodeId);
+        if (episode == null) continue;
+
+        final destPath = episode.isMovie
+            ? await _storageService.movieFilePath(content, podPath, srcPath)
+            : await _storageService.episodeFilePath(
+                content,
+                podPath,
+                episode.seasonNumber ?? 1,
+                episode.episodeNumber ?? 1,
+                srcPath,
+              );
+
+        onUpdate(
+          job.copyWith(
+            currentStep:
+                'Linking S${(episode.seasonNumber ?? 0).toString().padLeft(2, '0')}E${(episode.episodeNumber ?? 0).toString().padLeft(2, '0')}...',
+            progress: (filesDone / totalFiles) * 0.9,
+          ),
+        );
+
+        await _moveFile(srcPath, destPath);
+        await _episodeRepo.update(
+          episode.copyWith(videoPath: destPath, fileStatus: FileStatus.ready),
+        );
+        filesDone++;
+      }
+
+      onUpdate(
+        job.copyWith(currentStep: 'Scribing metadata...', progress: 0.95),
+      );
+      await _syncContentStatus(content.id!);
+
+      final allEpisodes = await _episodeRepo.getByContentId(content.id!);
+      await _metadataService.scribe(
+        content: (await _contentRepo.getById(content.id!)) ?? content,
+        episodes: allEpisodes,
+        podPath: podPath,
+      );
+
+      onUpdate(
+        job.copyWith(
+          status: ImportJobStatus.done,
+          progress: 1.0,
+          currentStep: 'Done',
+        ),
+      );
+    } catch (e, st) {
+      debugPrint('[ImportService] Link failed: $e\n$st');
+      onUpdate(
+        job.copyWith(status: ImportJobStatus.error, error: e.toString()),
+      );
+    }
+  }
+
+  /// Re-links (replaces) a single episode's media file.
+  Future<void> relinkEpisode({
     required Content content,
     required Episode episode,
     required String sourceFilePath,
   }) async {
     if (content.podPath == null || episode.id == null) return;
 
+    final podPath = content.podPath!;
     final destPath = episode.isMovie
-        ? await _storageService.movieFilePath(
-            content,
-            content.podPath!,
-            sourceFilePath,
-          )
+        ? await _storageService.movieFilePath(content, podPath, sourceFilePath)
         : await _storageService.episodeFilePath(
             content,
-            content.podPath!,
+            podPath,
             episode.seasonNumber!,
             episode.episodeNumber!,
             sourceFilePath,
@@ -393,26 +529,22 @@ class ImportService {
     await _moveFile(sourceFilePath, destPath);
 
     final oldPath = episode.videoPath;
-    final updatedEp = episode.copyWith(
-      videoPath: destPath,
-      fileStatus: FileStatus.ready,
+    await _episodeRepo.update(
+      episode.copyWith(videoPath: destPath, fileStatus: FileStatus.ready),
     );
-    await _episodeRepo.update(updatedEp);
 
-    // Delete old file if different
     if (oldPath != null && oldPath != destPath) {
-      try {
-        final f = File(oldPath);
-        if (await f.exists()) await f.delete();
-      } catch (_) {}
+      final f = File(oldPath);
+      if (await f.exists()) await f.delete();
     }
 
-    // Re-scribe metadata
+    await _syncContentStatus(content.id!);
+
     final allEps = await _episodeRepo.getByContentId(content.id!);
     await _metadataService.scribe(
-      content: content,
+      content: (await _contentRepo.getById(content.id!)) ?? content,
       episodes: allEps,
-      podPath: content.podPath!,
+      podPath: podPath,
     );
   }
 
@@ -420,29 +552,95 @@ class ImportService {
   // Deletion
   // ---------------------------------------------------------------------------
 
-  /// Deletes library records. If [deleteFiles] is true, also removes the
-  /// entire pod folder from disk.
   Future<void> deleteContent(
     Content content, {
     bool deleteFiles = false,
   }) async {
     if (content.id == null) return;
-
     if (deleteFiles && content.podPath != null) {
       final dir = Directory(content.podPath!);
-      if (await dir.exists()) {
-        try {
-          await dir.delete(recursive: true);
-        } catch (_) {}
-      }
+      if (await dir.exists()) await dir.delete(recursive: true);
     }
-
     await _contentRepo.delete(content.id!);
   }
 
+  Future<void> deleteEpisodeFile({
+    required Content content,
+    required Episode episode,
+  }) async {
+    // Always update the DB/scribe — even if the file is already gone from disk.
+    if (episode.videoPath != null) {
+      final file = File(episode.videoPath!);
+      if (await file.exists()) await file.delete();
+    }
+    await _episodeRepo.update(
+      episode.copyWith(clearVideoPath: true, fileStatus: FileStatus.missing),
+    );
+
+    if (content.podPath != null) {
+      await _syncContentStatus(content.id!);
+      final allEps = await _episodeRepo.getByContentId(content.id!);
+      await _metadataService.scribe(
+        content: (await _contentRepo.getById(content.id!)) ?? content,
+        episodes: allEps,
+        podPath: content.podPath!,
+      );
+    }
+  }
+
+  Future<void> deleteEpisodesBatch({
+    required Content content,
+    required List<Episode> episodes,
+  }) async {
+    for (final ep in episodes) {
+      // Always clear the DB record for every selected episode.
+      if (ep.videoPath != null) {
+        final file = File(ep.videoPath!);
+        if (await file.exists()) await file.delete();
+      }
+      await _episodeRepo.update(
+        ep.copyWith(clearVideoPath: true, fileStatus: FileStatus.missing),
+      );
+    }
+
+    if (content.podPath != null) {
+      await _syncContentStatus(content.id!);
+      final allEps = await _episodeRepo.getByContentId(content.id!);
+
+      await _metadataService.scribe(
+        content: (await _contentRepo.getById(content.id!)) ?? content,
+        episodes: allEps,
+        podPath: content.podPath!,
+      );
+    }
+  }
+
   // ---------------------------------------------------------------------------
-  // File move / copy
+  // Internal Helpers
   // ---------------------------------------------------------------------------
+
+  /// Returns true if the device can reach the internet.
+  Future<bool> _hasInternet() async {
+    try {
+      final result = await InternetAddress.lookup('api.themoviedb.org');
+      return result.isNotEmpty && result.first.rawAddress.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Ensures the parent Content's fileStatus matches the availability of its episodes.
+  /// If at least one episode is 'ready', the content is 'ready'.
+  Future<void> _syncContentStatus(int contentId) async {
+    final episodes = await _episodeRepo.getByContentId(contentId);
+    final anyReady = episodes.any((e) => e.fileStatus == FileStatus.ready);
+    final newStatus = anyReady ? FileStatus.ready : FileStatus.missing;
+
+    final content = await _contentRepo.getById(contentId);
+    if (content != null && content.fileStatus != newStatus) {
+      await _contentRepo.update(content.copyWith(fileStatus: newStatus));
+    }
+  }
 
   Future<void> _moveFile(
     String src,
@@ -451,35 +649,22 @@ class ImportService {
   }) async {
     final source = File(src);
     if (!await source.exists()) throw SourceFileMissingException(src);
-
     final destination = File(dest);
-
-    // Ensure destination directory exists
     await destination.parent.create(recursive: true);
 
-    // Try atomic rename first (same filesystem = instant)
     try {
       if (await destination.exists()) await destination.delete();
       await source.rename(dest);
       onProgress?.call(1.0);
       return;
-    } catch (_) {
-      // Cross-filesystem: fall back to copy + delete
-    }
+    } catch (_) {}
 
     await _copyWithProgress(source, destination, onProgress);
-
-    // Only delete source if it's in a temporary/cache directory.
-    // On Android, file_picker paths often contain '/cache/' or '/tmp/'.
-    // This prevents accidental deletion of user originals if they picked from a stable folder.
     final isCacheFile =
         src.contains('/cache/') ||
         src.contains('/tmp/') ||
         src.contains('com.android.providers.downloads.documents');
-
-    if (isCacheFile) {
-      await source.delete();
-    }
+    if (isCacheFile) await source.delete();
   }
 
   Future<void> _copyWithProgress(

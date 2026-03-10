@@ -52,7 +52,7 @@ class HorizontalMediaRow extends StatelessWidget {
           ),
         ),
         SizedBox(
-          height: 250, // Increased from 230 to prevent overflow
+          height: 250,
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             scrollDirection: Axis.horizontal,

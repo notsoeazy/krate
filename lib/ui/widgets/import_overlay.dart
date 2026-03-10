@@ -1,9 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:krate/core/constants.dart';
+import 'package:krate/utils/constants.dart';
 import 'package:krate/data/models/import_job.dart';
 import 'package:krate/providers/providers.dart';
+import 'package:krate/ui/screens/import/search_import_screen.dart';
 
 class ImportOverlay extends ConsumerStatefulWidget {
   final Widget child;
@@ -16,6 +17,12 @@ class ImportOverlay extends ConsumerStatefulWidget {
 
 class _ImportOverlayState extends ConsumerState<ImportOverlay> {
   bool _isExpanded = false;
+
+  void setExpanded(bool value) {
+    setState(() {
+      _isExpanded = value;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,9 +44,12 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
             ),
           ),
 
-        // Floating UI
+        // Toast at the top
+        ImportToast(onExpand: () => setState(() => _isExpanded = true)),
+
+        // Floating UI at the bottom
         Positioned(
-          bottom: 16, // Relative to body bottom (above NavigationBar)
+          bottom: 16,
           right: 16,
           left: _isExpanded ? 16 : null,
           child: Column(
@@ -64,15 +74,14 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
     final theme = Theme.of(context);
 
     if (activeCount > 0 && !_isExpanded) {
-      // Show pill-shaped progress indicator matching FAB height and color
       return GestureDetector(
         onTap: () => setState(() => _isExpanded = true),
         child: Container(
-          height: 56, // Match standard FAB height exactly
+          height: 56,
           padding: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
-            color: theme.colorScheme.primary, // Match FAB color
-            borderRadius: BorderRadius.circular(16), // Match M3 FAB rounding
+            color: theme.colorScheme.primary,
+            borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.3),
@@ -108,10 +117,11 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
       );
     }
 
-    // Default Import FAB (only shown when not expanded)
     if (!_isExpanded) {
       return FloatingActionButton.extended(
-        onPressed: () => context.push('/import'),
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (context) => const SearchImportScreen()),
+        ),
         icon: const Icon(Icons.add),
         label: const Text('Import'),
         backgroundColor: theme.colorScheme.primary,
@@ -143,7 +153,6 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Header
           Padding(
             padding: const EdgeInsets.all(12),
             child: Row(
@@ -160,7 +169,6 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
             ),
           ),
           const Divider(height: 1),
-          // List
           Flexible(
             child: ListView.separated(
               shrinkWrap: true,
@@ -174,12 +182,14 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
               },
             ),
           ),
-          // Clear finished button
           if (jobs.any((j) => !j.isActive))
-            TextButton(
-              onPressed: () =>
-                  ref.read(importJobsProvider.notifier).dismissCompleted(),
-              child: const Text('Clear finished'),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: TextButton(
+                onPressed: () =>
+                    ref.read(importJobsProvider.notifier).dismissCompleted(),
+                child: const Text('Clear finished'),
+              ),
             ),
         ],
       ),
@@ -247,5 +257,161 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
       return Icon(Icons.error, color: theme.colorScheme.error, size: 16);
     }
     return const SizedBox.shrink();
+  }
+}
+
+class ImportToast extends ConsumerStatefulWidget {
+  final VoidCallback onExpand;
+
+  const ImportToast({super.key, required this.onExpand});
+
+  @override
+  ConsumerState<ImportToast> createState() => _ImportToastState();
+}
+
+class _ImportToastState extends ConsumerState<ImportToast> {
+  Timer? _dismissTimer;
+
+  @override
+  void dispose() {
+    _dismissTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startTimer() {
+    _dismissTimer?.cancel();
+    _dismissTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) {
+        ref.read(importToastProvider.notifier).dismiss();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final job = ref.watch(importToastProvider);
+    if (job == null) return const SizedBox.shrink();
+
+    _startTimer();
+
+    final theme = Theme.of(context);
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: TweenAnimationBuilder<double>(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutBack,
+          tween: Tween(begin: -100.0, end: 0.0),
+          builder: (context, offset, child) {
+            return Transform.translate(offset: Offset(0, offset), child: child);
+          },
+          child: GestureDetector(
+            onTap: () {
+              ref.read(importToastProvider.notifier).dismiss();
+              widget.onExpand();
+            },
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  _StatusIcon(job: job),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          job.title,
+                          style: theme.textTheme.titleSmall,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          job.status == ImportJobStatus.done
+                              ? 'Import complete'
+                              : job.status == ImportJobStatus.error
+                              ? 'Import failed'
+                              : job.currentStep ?? 'Importing...',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: job.status == ImportJobStatus.error
+                                ? theme.colorScheme.error
+                                : theme.colorScheme.onSurfaceVariant,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () {
+                      ref.read(importToastProvider.notifier).dismiss();
+                    },
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusIcon extends StatelessWidget {
+  final ImportJob job;
+
+  const _StatusIcon({required this.job});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (job.status == ImportJobStatus.done) {
+      return Container(
+        padding: const EdgeInsets.all(4),
+        decoration: const BoxDecoration(
+          color: Colors.green,
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(Icons.check, color: Colors.white, size: 16),
+      );
+    }
+
+    if (job.status == ImportJobStatus.error) {
+      return Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.error,
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(Icons.priority_high, color: Colors.white, size: 16),
+      );
+    }
+
+    return SizedBox(
+      width: 20,
+      height: 20,
+      child: CircularProgressIndicator(
+        strokeWidth: 2,
+        value: job.progress > 0 ? job.progress : null,
+      ),
+    );
   }
 }

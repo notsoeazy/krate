@@ -1,4 +1,4 @@
-import 'package:krate/core/constants.dart';
+import 'package:krate/utils/constants.dart';
 
 /// Represents a single in-flight or recently completed import operation.
 ///

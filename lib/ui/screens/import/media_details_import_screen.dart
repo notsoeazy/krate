@@ -1,10 +1,11 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:krate/core/constants.dart';
+import 'package:krate/utils/constants.dart';
 import 'package:krate/data/models/content.dart';
 import 'package:krate/providers/providers.dart';
+import 'package:krate/ui/widgets/busy_overlay.dart';
+import 'package:krate/ui/screens/import/series_episode_picker_screen.dart';
 
 class MediaDetailsImportScreen extends ConsumerStatefulWidget {
   final int tmdbId;
@@ -50,7 +51,7 @@ class _MediaDetailsImportScreenState
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Failed to load details: $e')));
-        context.pop();
+        Navigator.of(context).pop();
       }
     }
   }
@@ -74,7 +75,12 @@ class _MediaDetailsImportScreenState
 
     if (widget.type == ContentType.series) {
       // Go to Episode Picker for series
-      context.push('/import/picker/${_content!.tmdbId}');
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) =>
+              SeriesEpisodePickerScreen(tmdbId: _content!.tmdbId!),
+        ),
+      );
       return;
     }
 
@@ -95,7 +101,8 @@ class _MediaDetailsImportScreenState
         );
 
     // Immediate redirect to Home
-    context.go('/');
+    // Pop back to root or trigger a refresh
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   @override
@@ -186,22 +193,7 @@ class _MediaDetailsImportScreenState
             ),
           ),
           if (_isBusy)
-            Container(
-              color: Colors.black54,
-              child: const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text(
-                      'Accessing storage...',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            const BusyOverlay(message: 'Accessing storage...', showBlur: false),
         ],
       ),
     );

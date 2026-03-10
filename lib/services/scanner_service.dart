@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:krate/core/constants.dart';
+import 'package:krate/utils/constants.dart';
 import 'package:krate/data/repositories/content_repository.dart';
 import 'package:krate/data/repositories/episode_repository.dart';
 import 'package:krate/services/metadata_service.dart';

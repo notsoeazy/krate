@@ -2,11 +2,14 @@ import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:krate/core/constants.dart';
+import 'package:krate/utils/constants.dart';
 import 'package:krate/data/models/content.dart';
 import 'package:krate/providers/providers.dart';
+import 'package:krate/ui/screens/library/media_management_screen.dart';
+import 'package:krate/ui/screens/player/player_screen.dart';
 import 'package:krate/ui/widgets/episode_tile.dart';
+import 'package:krate/ui/widgets/expandable_text.dart';
+import 'package:krate/data/models/episode.dart';
 
 class MediaDetailsScreen extends ConsumerWidget {
   final int contentId;
@@ -42,6 +45,7 @@ class _MediaDetailsScaffold extends ConsumerStatefulWidget {
 class _MediaDetailsScaffoldState extends ConsumerState<_MediaDetailsScaffold>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  int? _manualSeasonIndex;
 
   @override
   void initState() {
@@ -50,6 +54,7 @@ class _MediaDetailsScaffoldState extends ConsumerState<_MediaDetailsScaffold>
         ? widget.content.totalSeasons
         : 1;
     _tabController = TabController(length: seasonCount, vsync: this);
+    _tabController.addListener(_onSeasonTabChanged);
   }
 
   @override
@@ -58,39 +63,74 @@ class _MediaDetailsScaffoldState extends ConsumerState<_MediaDetailsScaffold>
     super.dispose();
   }
 
+  void _onSeasonTabChanged() {
+    if (_tabController.indexIsChanging) return;
+    setState(() {
+      _manualSeasonIndex = _tabController.index;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final content = widget.content;
     final isSeries = content.contentType == ContentType.series;
 
+    final resumeEpisodeAsync = ref.watch(resumeEpisodeProvider(content.id!));
+
+    // Update tab index based on resume episode if not manually changed
+    ref.listen(resumeEpisodeProvider(content.id!), (previous, next) {
+      if (_manualSeasonIndex == null && next.hasValue && next.value != null) {
+        final ep = next.value!;
+        if (ep.seasonNumber != null &&
+            ep.seasonNumber! <= _tabController.length) {
+          _tabController.animateTo(ep.seasonNumber! - 1);
+        }
+      }
+    });
+
     return Scaffold(
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) {
           return [
             SliverAppBar(
-              expandedHeight: 240,
+              expandedHeight: 300,
               pinned: true,
               stretch: true,
+              leading: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: _buildCircularButton(
+                  context,
+                  icon: Icons.arrow_back,
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ),
               flexibleSpace: FlexibleSpaceBar(
-                background: _buildBackdrop(context, content),
                 title: Text(
                   content.title,
                   style: const TextStyle(
+                    fontWeight: FontWeight.bold,
                     shadows: [
                       Shadow(
-                        blurRadius: 10,
+                        offset: Offset(0, 1),
+                        blurRadius: 8,
                         color: Colors.black,
-                        offset: Offset(0, 2),
                       ),
                     ],
                   ),
                 ),
-                titlePadding: EdgeInsetsDirectional.only(
-                  start: 48,
-                  bottom: isSeries ? 16 : 16, // Unified bottom padding
+                centerTitle: false,
+                titlePadding: const EdgeInsetsDirectional.only(
+                  start: 56,
+                  bottom: 16,
                 ),
+                background: _buildBackdrop(context, content),
+                stretchModes: const [
+                  StretchMode.zoomBackground,
+                  StretchMode.blurBackground,
+                ],
               ),
+              actions: [_buildMoreMenu(context, content)],
             ),
             SliverToBoxAdapter(
               child: Padding(
@@ -98,8 +138,6 @@ class _MediaDetailsScaffoldState extends ConsumerState<_MediaDetailsScaffold>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildMetadataRow(context, content),
-                    const SizedBox(height: 16),
                     if (content.tagline != null && content.tagline!.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8.0),
@@ -111,9 +149,18 @@ class _MediaDetailsScaffoldState extends ConsumerState<_MediaDetailsScaffold>
                           ),
                         ),
                       ),
-                    Text(
-                      content.description ?? 'No description available.',
+                    _buildMetadataRow(context, content),
+                    const SizedBox(height: 16),
+                    ExpandableText(
+                      text: content.description ?? 'No description available.',
                       style: theme.textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 24),
+                    _buildContinueButton(
+                      context,
+                      ref,
+                      content,
+                      resumeEpisodeAsync,
                     ),
                     const SizedBox(height: 16),
                   ],
@@ -131,18 +178,13 @@ class _MediaDetailsScaffoldState extends ConsumerState<_MediaDetailsScaffold>
                     labelColor: theme.colorScheme.primary,
                     unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
                     indicatorColor: theme.colorScheme.primary,
+                    onTap: (index) =>
+                        setState(() => _manualSeasonIndex = index),
                     tabs: List.generate(
                       content.totalSeasons,
                       (i) => Tab(text: 'Season ${i + 1}'),
                     ),
                   ),
-                ),
-              ),
-            if (!isSeries && content.fileStatus == FileStatus.ready)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: _MoviePlayButton(contentId: content.id!),
                 ),
               ),
           ];
@@ -173,46 +215,288 @@ class _MediaDetailsScaffoldState extends ConsumerState<_MediaDetailsScaffold>
           _buildBadge(context, '${content.runtime} min'),
         const SizedBox(width: 8),
         _buildBadge(context, content.contentType.name.toUpperCase()),
-        const Spacer(),
-        IconButton(
-          icon: Icon(
-            content.isFavorite ? Icons.favorite : Icons.favorite_border,
-          ),
-          color: content.isFavorite ? Colors.red : null,
-          onPressed: () async {
-            await ref
-                .read(contentRepoProvider)
-                .setFavorite(content.id!, !content.isFavorite);
-            ref.invalidate(contentProvider(content.id!));
-            ref.invalidate(moviesProvider);
-            ref.invalidate(seriesProvider);
-          },
-        ),
       ],
     );
   }
 
   Widget _buildBackdrop(BuildContext context, Content content) {
+    Widget image;
     if (content.localBackdropPath != null) {
       final file = File(content.localBackdropPath!);
       if (file.existsSync()) {
-        return Image.file(file, fit: BoxFit.cover, alignment: Alignment.center);
+        image = Image.file(
+          file,
+          fit: BoxFit.cover,
+          alignment: Alignment.center,
+        );
+      } else {
+        image = _buildPosterFallback(content);
       }
-    }
-
-    if (content.tmdbBackdropPath != null) {
-      return CachedNetworkImage(
+    } else if (content.tmdbBackdropPath != null) {
+      image = CachedNetworkImage(
         imageUrl:
             '$kTmdbImageBase/$kTmdbBackdropSize${content.tmdbBackdropPath}',
         fit: BoxFit.cover,
         alignment: Alignment.center,
         placeholder: (context, url) => Container(color: Colors.black26),
-        errorWidget: (context, url, error) => const Icon(Icons.error),
+        errorWidget: (context, url, error) => _buildPosterFallback(content),
       );
+    } else {
+      image = _buildPosterFallback(content);
     }
 
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        image,
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black45,
+                Colors.transparent,
+                Colors.transparent,
+                Colors.black87,
+              ],
+              stops: [0.0, 0.3, 0.7, 1.0],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPosterFallback(Content content) {
+    if (content.localPosterPath != null) {
+      final file = File(content.localPosterPath!);
+      if (file.existsSync()) {
+        return Image.file(file, fit: BoxFit.cover, alignment: Alignment.center);
+      }
+    }
+    if (content.tmdbPosterPath != null) {
+      return CachedNetworkImage(
+        imageUrl: '$kTmdbImageBase/$kTmdbPosterSize${content.tmdbPosterPath}',
+        fit: BoxFit.cover,
+        alignment: Alignment.center,
+      );
+    }
+    return Container(color: Colors.black26);
+  }
+
+  Widget _buildCircularButton(
+    BuildContext context, {
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
     return Container(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.4),
+        shape: BoxShape.circle,
+      ),
+      child: IconButton(
+        icon: Icon(icon, color: Colors.white),
+        onPressed: onPressed,
+      ),
+    );
+  }
+
+  Widget _buildContinueButton(
+    BuildContext context,
+    WidgetRef ref,
+    Content content,
+    AsyncValue<Episode?> resumeEpisodeAsync,
+  ) {
+    return resumeEpisodeAsync.when(
+      data: (episode) {
+        if (episode == null) return const SizedBox.shrink();
+
+        final hasFile = episode.hasFile;
+        String label = 'Play';
+        if (content.contentType == ContentType.series) {
+          label = 'Play S${episode.seasonNumber}:E${episode.episodeNumber}';
+        } else {
+          label = 'Play Movie';
+        }
+
+        final progressAsync = ref.watch(watchProgressProvider(episode.id!));
+        return progressAsync.when(
+          data: (progress) {
+            final isResume =
+                progress != null &&
+                progress.positionMs > 0 &&
+                !progress.isFinished;
+            final finalLabel = isResume
+                ? label.replaceFirst('Play', 'Resume')
+                : label;
+
+            return _buildActualContinueButton(
+              context,
+              ref,
+              content,
+              episode,
+              finalLabel,
+              hasFile,
+            );
+          },
+          loading: () => _buildLoadingContinueButton(context, label),
+          error: (_, _) => _buildActualContinueButton(
+            context,
+            ref,
+            content,
+            episode,
+            label,
+            hasFile,
+          ),
+        );
+      },
+      loading: () => _buildLoadingContinueButton(context, 'Play'),
+      error: (_, _) => const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildActualContinueButton(
+    BuildContext context,
+    WidgetRef ref,
+    Content content,
+    Episode episode,
+    String label,
+    bool hasFile,
+  ) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: hasFile
+                ? () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          PlayerScreen(episodeId: episode.id!),
+                    ),
+                  )
+                : null,
+            icon: const Icon(Icons.play_arrow),
+            label: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
+              disabledBackgroundColor: theme.colorScheme.onSurface.withValues(
+                alpha: 0.12,
+              ),
+              disabledForegroundColor: theme.colorScheme.onSurface.withValues(
+                alpha: 0.38,
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.5,
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: IconButton(
+            icon: Icon(
+              content.isFavorite ? Icons.favorite : Icons.favorite_border,
+              color: content.isFavorite ? Colors.red : null,
+            ),
+            onPressed: () async {
+              await ref
+                  .read(contentRepoProvider)
+                  .setFavorite(content.id!, !content.isFavorite);
+              ref.invalidate(contentProvider(content.id!));
+              ref.invalidate(moviesProvider);
+              ref.invalidate(seriesProvider);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLoadingContinueButton(BuildContext context, String label) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: null,
+            icon: const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            label: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.5,
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMoreMenu(BuildContext context, Content content) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.4),
+          shape: BoxShape.circle,
+        ),
+        child: PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert, color: Colors.white),
+          onSelected: (value) {
+            if (value == 'manage') {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) =>
+                      MediaManagementScreen(contentId: content.id!),
+                ),
+              );
+            }
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: 'manage',
+              child: ListTile(
+                leading: Icon(Icons.video_library),
+                title: Text('Manage Media'),
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -265,7 +549,11 @@ class _SeasonEpisodeList extends ConsumerWidget {
               episode: ep,
               onPlay: () {
                 if (ep.id != null) {
-                  context.push('/player/${ep.id}');
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => PlayerScreen(episodeId: ep.id!),
+                    ),
+                  );
                 }
               },
             );
@@ -274,40 +562,6 @@ class _SeasonEpisodeList extends ConsumerWidget {
       },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Error loading episodes: $e')),
-    );
-  }
-}
-
-class _MoviePlayButton extends ConsumerWidget {
-  final int contentId;
-  const _MoviePlayButton({required this.contentId});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final episodesAsync = ref.watch(contentEpisodesProvider(contentId));
-    final theme = Theme.of(context);
-
-    return episodesAsync.when(
-      data: (eps) {
-        if (eps.isEmpty) return const SizedBox.shrink();
-        final movieEp = eps.first;
-
-        return ElevatedButton.icon(
-          onPressed: () => context.push('/player/${movieEp.id}'),
-          icon: const Icon(Icons.play_arrow),
-          label: const Text('Play Movie'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: theme.colorScheme.primary,
-            foregroundColor: theme.colorScheme.onPrimary,
-            minimumSize: const Size(double.infinity, 50),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (error, stack) => const SizedBox.shrink(),
     );
   }
 }

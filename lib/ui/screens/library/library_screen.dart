@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:krate/core/constants.dart';
+import 'package:krate/utils/constants.dart';
 import 'package:krate/providers/providers.dart';
+import 'package:krate/ui/screens/library/media_details_screen.dart';
 import 'package:krate/ui/widgets/media_card.dart';
 
 class LibraryScreen extends ConsumerStatefulWidget {
-  final ContentType initialType;
-
-  const LibraryScreen({super.key, this.initialType = ContentType.movie});
+  const LibraryScreen({super.key});
 
   @override
   ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
@@ -23,10 +21,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   @override
   void initState() {
     super.initState();
+    // Read the initial tab from the shared provider (set by Home's "See All").
+    final initialTab = ref.read(libraryTabProvider);
     _tabController = TabController(
       length: 2,
       vsync: this,
-      initialIndex: widget.initialType == ContentType.movie ? 0 : 1,
+      initialIndex: initialTab,
     );
   }
 
@@ -39,6 +39,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
   @override
   Widget build(BuildContext context) {
+    // React to Home's "See All" taps even when already mounted in IndexedStack.
+    ref.listen<int>(libraryTabProvider, (_, next) {
+      if (_tabController.index != next) {
+        _tabController.animateTo(next);
+      }
+    });
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Library'),
@@ -147,7 +154,12 @@ class _ContentGrid extends ConsumerWidget {
           itemBuilder: (context, index) {
             return MediaCard(
               content: filtered[index],
-              onTap: () => context.push('/details/${filtered[index].id}'),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) =>
+                      MediaDetailsScreen(contentId: filtered[index].id!),
+                ),
+              ),
             );
           },
         );

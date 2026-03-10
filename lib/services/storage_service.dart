@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:krate/core/constants.dart';
-import 'package:krate/core/errors.dart';
+import 'package:krate/utils/constants.dart';
+import 'package:krate/utils/errors.dart';
 import 'package:krate/data/models/content.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:krate/core/extensions.dart';
+import 'package:krate/utils/extensions.dart';
 
 enum VaultStatus { ok, rootMissing, noPermission }
 
