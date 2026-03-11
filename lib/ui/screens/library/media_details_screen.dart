@@ -8,9 +8,13 @@ import 'package:krate/data/models/content.dart';
 import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/screens/library/media_management_screen.dart';
 import 'package:krate/ui/screens/player/player_screen.dart';
-import 'package:krate/ui/widgets/episode_tile.dart';
+
 import 'package:krate/ui/widgets/expandable_text.dart';
 import 'package:krate/data/models/episode.dart';
+import 'package:krate/ui/widgets/media_backdrop.dart';
+import 'package:krate/ui/widgets/media_more_menu_button.dart';
+import 'package:krate/ui/widgets/season_episode_list.dart';
+import 'package:krate/ui/widgets/sliver_tab_bar_delegate.dart';
 
 // Max expanded height of the backdrop
 const double _kExpandedHeight = 340.0;
@@ -143,12 +147,12 @@ class _MediaDetailsScaffoldState extends ConsumerState<_MediaDetailsScaffold>
             );
           },
         ),
-        leading: _OverlayIconButton(
-          icon: Icons.arrow_back,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
-          _MoreMenuButton(
+          MediaMoreMenuButton(
             onManage: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (context) =>
@@ -164,7 +168,7 @@ class _MediaDetailsScaffoldState extends ConsumerState<_MediaDetailsScaffold>
           background: Stack(
             fit: StackFit.expand,
             children: [
-              _buildBackdrop(content),
+              MediaBackdrop(content: content),
               ClipRect(
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
@@ -309,7 +313,7 @@ class _MediaDetailsScaffoldState extends ConsumerState<_MediaDetailsScaffold>
       if (isSeries)
         SliverPersistentHeader(
           pinned: true,
-          delegate: _SliverTabBarDelegate(
+          delegate: SliverTabBarDelegate(
             TabBar(
               controller: _tabController,
               isScrollable: true,
@@ -333,7 +337,7 @@ class _MediaDetailsScaffoldState extends ConsumerState<_MediaDetailsScaffold>
                 controller: _tabController,
                 children: List.generate(
                   content.totalSeasons,
-                  (i) => _SeasonEpisodeList(
+                  (i) => SeasonEpisodeList(
                     contentId: content.id!,
                     seasonNumber: i + 1,
                   ),
@@ -344,7 +348,7 @@ class _MediaDetailsScaffoldState extends ConsumerState<_MediaDetailsScaffold>
     );
   }
 
-  // Header metadata row
+  // Header Metadata
   Widget _buildHeaderInfoRow(Content content, ThemeData theme) {
     final parts = <String>[];
     if (content.releaseDate != null) {
@@ -386,7 +390,7 @@ class _MediaDetailsScaffoldState extends ConsumerState<_MediaDetailsScaffold>
     );
   }
 
-  // Poster image
+  // Poster
   Widget _buildPoster(Content content) {
     ImageProvider? image;
     if (content.localPosterPath != null) {
@@ -435,7 +439,7 @@ class _MediaDetailsScaffoldState extends ConsumerState<_MediaDetailsScaffold>
     );
   }
 
-  // Genre chips
+  // Genres
   Widget _buildGenreChips(Content content, ThemeData theme) {
     return Wrap(
       spacing: 6,
@@ -456,7 +460,7 @@ class _MediaDetailsScaffoldState extends ConsumerState<_MediaDetailsScaffold>
     );
   }
 
-  // Play and favorite buttons
+  // Actions
   Widget _buildContinueButton(
     BuildContext context,
     WidgetRef ref,
@@ -605,249 +609,5 @@ class _MediaDetailsScaffoldState extends ConsumerState<_MediaDetailsScaffold>
   }
 }
 
-// Backdrop image stack with gradient scrim
-Widget _buildBackdrop(Content content) {
-  Widget image;
-  if (content.localBackdropPath != null) {
-    final f = File(content.localBackdropPath!);
-    if (f.existsSync()) {
-      image = Image.file(
-        f,
-        key: ValueKey(content.updatedAt),
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: double.infinity,
-      );
-    } else {
-      image = _posterFallback(content);
-    }
-  } else if (content.tmdbBackdropPath != null) {
-    image = CachedNetworkImage(
-      imageUrl: '$kTmdbImageBase/$kTmdbBackdropSize${content.tmdbBackdropPath}',
-      fit: BoxFit.cover,
-      width: double.infinity,
-      height: double.infinity,
-      placeholder: (ctx, url) => const SizedBox.shrink(),
-      errorWidget: (ctx, url, err) => _posterFallback(content),
-    );
-  } else {
-    image = _posterFallback(content);
-  }
 
-  return Stack(
-    fit: StackFit.expand,
-    children: [
-      image,
-      const DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.black45,
-              Colors.transparent,
-              Colors.transparent,
-              Colors.black87,
-            ],
-            stops: [0.0, 0.3, 0.7, 1.0],
-          ),
-        ),
-      ),
-    ],
-  );
-}
 
-Widget _posterFallback(Content content) {
-  if (content.localPosterPath != null) {
-    final f = File(content.localPosterPath!);
-    if (f.existsSync()) {
-      return Image.file(
-        f,
-        key: ValueKey(content.updatedAt),
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: double.infinity,
-      );
-    } else {
-      // If local path exists but file missing, return themed placeholder
-      return ColoredBox(
-        color: Colors.grey[900]!,
-        child: Center(
-          child: Icon(
-            content.contentType == ContentType.series ? Icons.tv : Icons.movie,
-            color: Colors.white12,
-            size: 80,
-          ),
-        ),
-      );
-    }
-  }
-  if (content.tmdbPosterPath != null) {
-    return CachedNetworkImage(
-      imageUrl: '$kTmdbImageBase/$kTmdbPosterSize${content.tmdbPosterPath}',
-      fit: BoxFit.cover,
-      width: double.infinity,
-      height: double.infinity,
-    );
-  }
-  return const SizedBox.shrink();
-}
-
-// Overlay icon button
-// Circular button with a semi-transparent dark background
-class _OverlayIconButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onPressed;
-
-  const _OverlayIconButton({required this.icon, required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(icon: Icon(icon), onPressed: onPressed);
-  }
-}
-
-// More menu button
-// M3 MenuAnchor with rounded corners and spacious menu items
-class _MoreMenuButton extends StatelessWidget {
-  final VoidCallback onManage;
-  final VoidCallback onVaultSync;
-  final VoidCallback onFetchMetadata;
-
-  const _MoreMenuButton({
-    required this.onManage,
-    required this.onVaultSync,
-    required this.onFetchMetadata,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return MenuAnchor(
-      style: MenuStyle(
-        shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
-        padding: const WidgetStatePropertyAll(
-          EdgeInsets.symmetric(vertical: 8),
-        ),
-      ),
-      menuChildren: [
-        MenuItemButton(
-          leadingIcon: const Icon(Icons.video_library_outlined),
-          onPressed: onManage,
-          style: MenuItemButton.styleFrom(minimumSize: const Size(200, 48)),
-          child: const Text('Manage Media'),
-        ),
-        MenuItemButton(
-          leadingIcon: const Icon(Icons.sync_outlined),
-          onPressed: onVaultSync,
-          style: MenuItemButton.styleFrom(minimumSize: const Size(200, 48)),
-          child: const Text('Vault Sync'),
-        ),
-        MenuItemButton(
-          leadingIcon: const Icon(Icons.refresh_outlined),
-          onPressed: onFetchMetadata,
-          style: MenuItemButton.styleFrom(minimumSize: const Size(200, 48)),
-          child: const Text('Fetch Metadata'),
-        ),
-      ],
-      builder: (context, controller, child) {
-        return IconButton(
-          icon: const Icon(Icons.more_vert),
-          onPressed: () {
-            if (controller.isOpen) {
-              controller.close();
-            } else {
-              controller.open();
-            }
-          },
-        );
-      },
-    );
-  }
-}
-
-// Season episode list
-class _SeasonEpisodeList extends ConsumerWidget {
-  final int contentId;
-  final int seasonNumber;
-
-  const _SeasonEpisodeList({
-    required this.contentId,
-    required this.seasonNumber,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final episodesAsync = ref.watch(
-      mergedEpisodesProvider((
-        contentId: contentId,
-        seasonNumber: seasonNumber,
-      )),
-    );
-
-    return episodesAsync.when(
-      data: (eps) {
-        if (eps.isEmpty) {
-          return Center(
-            child: Text(
-              'No episodes found for this season.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.outline,
-              ),
-            ),
-          );
-        }
-        return ListView.separated(
-          padding: const EdgeInsets.fromLTRB(0, 8, 0, 32),
-          itemCount: eps.length,
-          separatorBuilder: (_, _) => const Divider(height: 1, indent: 72),
-          itemBuilder: (context, index) {
-            final ep = eps[index];
-            return EpisodeTile(
-              episode: ep,
-              onPlay: () {
-                if (ep.id != null) {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => PlayerScreen(episodeId: ep.id!),
-                    ),
-                  );
-                }
-              },
-            );
-          },
-        );
-      },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error loading episodes: $e')),
-    );
-  }
-}
-
-// ── Sliver tab bar delegate ───────────────────────────────────────────────────
-class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
-  final TabBar _tabBar;
-  _SliverTabBarDelegate(this._tabBar);
-
-  @override
-  double get minExtent => _tabBar.preferredSize.height;
-  @override
-  double get maxExtent => _tabBar.preferredSize.height;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
-    return ColoredBox(
-      color: Theme.of(context).scaffoldBackgroundColor,
-      child: _tabBar,
-    );
-  }
-
-  @override
-  bool shouldRebuild(_SliverTabBarDelegate old) => false;
-}

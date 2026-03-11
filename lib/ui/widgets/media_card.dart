@@ -45,12 +45,11 @@ class MediaCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Poster + badges ────────────────────────────────────────
+            // Poster
             AspectRatio(
               aspectRatio: 2 / 3,
               child: Stack(
                 children: [
-                  // Poster card
                   Positioned.fill(
                     child: Card(
                       margin: EdgeInsets.zero,
@@ -59,7 +58,6 @@ class MediaCard extends ConsumerWidget {
                     ),
                   ),
 
-                  // ── Top-left: Favorite badge ───────────────────────
                   if (content.isFavorite)
                     Positioned(
                       top: 6,
@@ -71,7 +69,6 @@ class MediaCard extends ConsumerWidget {
                       ),
                     ),
 
-                  // ── Top-right: Type badge ──────────────────────────
                   if (showType)
                     Positioned(
                       top: 6,
@@ -83,7 +80,6 @@ class MediaCard extends ConsumerWidget {
                       ),
                     ),
 
-                  // ── Bottom-right: Status badge ─────────────────────
                   Positioned(
                     bottom: 6,
                     right: 6,
@@ -100,7 +96,7 @@ class MediaCard extends ConsumerWidget {
 
             const SizedBox(height: 8),
 
-            // ── Title ──────────────────────────────────────────────────
+            // Title
             SizedBox(
               height: 36,
               child: Text(
@@ -111,7 +107,7 @@ class MediaCard extends ConsumerWidget {
               ),
             ),
 
-            // ── Metadata (Year • Runtime) ─────────────────────────────
+            // Metadata (Year, Runtime)
             Builder(
               builder: (context) {
                 final parts = <String>[];
@@ -234,7 +230,7 @@ class MediaCard extends ConsumerWidget {
   }
 }
 
-// ── Badge chip helper ─────────────────────────────────────────────────────────
+// Badge chip helper
 
 /// Small pill/icon badge used as poster overlay.
 class _BadgeChip extends StatelessWidget {

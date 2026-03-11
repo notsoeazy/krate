@@ -4,7 +4,9 @@ import 'package:krate/data/models/content.dart';
 import 'package:krate/data/models/episode.dart';
 import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/widgets/busy_overlay.dart';
-import 'package:krate/ui/widgets/managed_episode_tile.dart';
+import 'package:krate/ui/widgets/media_management_bottom_bar.dart';
+import 'package:krate/ui/widgets/media_management_movie_list.dart';
+import 'package:krate/ui/widgets/media_management_series_list.dart';
 import 'package:krate/utils/constants.dart';
 
 class MediaManagementScreen extends ConsumerStatefulWidget {
@@ -20,7 +22,7 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
   MediaManagementNotifier get _notifier =>
       ref.read(mediaManagementProvider(widget.contentId).notifier);
 
-  // ── Operations ────────────────────────────────────────────────────────────
+  // Operations
 
   Future<void> _runImport(Content content) async {
     final s = ref.read(mediaManagementProvider(widget.contentId));
@@ -138,60 +140,13 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
     }
   }
 
-  // ── Bottom bar ────────────────────────────────────────────────────────────
 
-  Widget _buildBottomBar(
-    MediaManagementState s,
-    Content content,
-    List<Episode> episodes,
-  ) {
-    if (!s.importButtonEnabled && !s.deleteButtonEnabled) {
-      return const SizedBox.shrink();
-    }
-
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        child: Row(
-          children: [
-            if (s.importButtonEnabled)
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () => _runImport(content),
-                  icon: const Icon(Icons.link),
-                  label: Text(
-                    'Import ${s.stagedFiles.length} '
-                    'File${s.stagedFiles.length == 1 ? '' : 's'}',
-                  ),
-                ),
-              ),
-            if (s.deleteButtonEnabled) ...[
-              if (s.importButtonEnabled) const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () => _runDelete(content, episodes),
-                  icon: const Icon(Icons.delete_outline),
-                  label: Text('Delete ${s.deleteSelections.length}'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.error,
-                    foregroundColor: Theme.of(context).colorScheme.onError,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(mediaManagementProvider(widget.contentId));
     final contentAsync = ref.watch(contentProvider(widget.contentId));
     final episodesAsync = ref.watch(contentEpisodesProvider(widget.contentId));
-    final theme = Theme.of(context);
-
     return contentAsync.when(
       data: (content) {
         if (content == null) {
@@ -203,6 +158,7 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
         return Scaffold(
           appBar: AppBar(
             title: Text('Manage ${content.title}'),
+            // Toolbar Actions
             actions: [
               if (isSeries && !s.isDeleteMode)
                 IconButton(
@@ -225,8 +181,10 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
                 ),
             ],
           ),
+          // Content Stack
           body: Stack(
             children: [
+              // Episode Selection List
               episodesAsync.when(
                 data: (episodes) {
                   if (content.contentType == ContentType.movie) {
@@ -234,99 +192,38 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
                       (e) => e.isMovie,
                       orElse: () => episodes.first,
                     );
-                    return ListView(
-                      children: [
-                        ManagedEpisodeTile(
-                          episode: movieEp,
-                          mode: s.isDeleteMode
-                              ? ManagedTileMode.delete
-                              : ManagedTileMode.normal,
-                          isSelected: s.deleteSelections.contains(movieEp.id),
-                          onSelectedChanged: (val) =>
-                              _notifier.toggleDeleteSelection(
-                                movieEp.id!,
-                                selected: val == true,
-                              ),
-                          stagedFile: s.stagedFiles[movieEp.id],
-                          onImport: () => _notifier.pickFile(
-                            episodeId: movieEp.id!,
-                            episodeHasFile: movieEp.hasFile,
-                          ),
-                          onRemoveFile: () =>
-                              _notifier.removeStaged(movieEp.id!),
-                        ),
-                      ],
+                    return MediaManagementMovieList(
+                      movieEp: movieEp,
+                      state: s,
+                      notifier: _notifier,
                     );
                   }
 
                   // Series: group by season
-                  final seasons = <int, List<Episode>>{};
-                  for (final ep in episodes) {
-                    seasons.putIfAbsent(ep.seasonNumber ?? 0, () => []).add(ep);
-                  }
-                  final sortedSeasons = seasons.keys.toList()..sort();
-
-                  return ListView.builder(
-                    itemCount: sortedSeasons.length,
-                    itemBuilder: (context, index) {
-                      final seasonNum = sortedSeasons[index];
-                      final seasonEpisodes = seasons[seasonNum]!
-                        ..sort(
-                          (a, b) => (a.episodeNumber ?? 0).compareTo(
-                            b.episodeNumber ?? 0,
-                          ),
-                        );
-
-                      return ExpansionTile(
-                        title: Text(
-                          'Season $seasonNum',
-                          style: theme.textTheme.titleMedium,
-                        ),
-                        subtitle: Text(
-                          '${seasonEpisodes.where((e) => e.hasFile).length}'
-                          ' / ${seasonEpisodes.length} Episodes',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        // M3: no Theme.copyWith hack
-                        shape: const Border(),
-                        collapsedShape: const Border(),
-                        initiallyExpanded: index == 0,
-                        children: seasonEpisodes.map((ep) {
-                          return ManagedEpisodeTile(
-                            episode: ep,
-                            mode: s.isDeleteMode
-                                ? ManagedTileMode.delete
-                                : ManagedTileMode.normal,
-                            isSelected: s.deleteSelections.contains(ep.id),
-                            onSelectedChanged: (val) =>
-                                _notifier.toggleDeleteSelection(
-                                  ep.id!,
-                                  selected: val == true,
-                                ),
-                            stagedFile: s.stagedFiles[ep.id],
-                            onImport: () => _notifier.pickFile(
-                              episodeId: ep.id!,
-                              episodeHasFile: ep.hasFile,
-                            ),
-                            onRemoveFile: () => _notifier.removeStaged(ep.id!),
-                          );
-                        }).toList(),
-                      );
-                    },
+                  return MediaManagementSeriesList(
+                    episodes: episodes,
+                    state: s,
+                    notifier: _notifier,
                   );
                 },
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, _) => Center(child: Text('Error: $e')),
               ),
+              // Overlays
               if (s.hasJobRunning) const BusyOverlay(message: 'Processing…'),
               if (s.isPickerOpen)
                 const BusyOverlay(message: 'Accessing storage…'),
             ],
           ),
+          // Bottom Action Bar
           bottomNavigationBar: episodesAsync
-              .whenData((eps) => _buildBottomBar(s, content, eps))
+              .whenData((eps) => MediaManagementBottomBar(
+                    state: s,
+                    content: content,
+                    episodes: eps,
+                    onImport: () => _runImport(content),
+                    onDelete: () => _runDelete(content, eps),
+                  ))
               .value,
         );
       },

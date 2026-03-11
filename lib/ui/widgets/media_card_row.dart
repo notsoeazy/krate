@@ -2,15 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:krate/data/models/content.dart';
 import 'package:krate/ui/widgets/media_card.dart';
 
-/// A horizontal scrolling row of [MediaCard]s with a titled header and
-/// a "See all" action button.
-class HorizontalMediaRow extends StatelessWidget {
+class MediaCardRow extends StatelessWidget {
   final String title;
   final List<Content> items;
   final VoidCallback onSeeAll;
   final Function(Content) onItemSelected;
 
-  const HorizontalMediaRow({
+  const MediaCardRow({
     super.key,
     required this.title,
     required this.items,
@@ -27,6 +25,7 @@ class HorizontalMediaRow extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Section header
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
           child: Row(
@@ -34,12 +33,11 @@ class HorizontalMediaRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(title, style: theme.textTheme.titleMedium),
-              // TextButton is the correct M3 low-emphasis action ─ replaces
-              // the old InkWell-wrapped Text.
               TextButton(onPressed: onSeeAll, child: const Text('See all')),
             ],
           ),
         ),
+        // Horizontal media list
         SizedBox(
           height: 240,
           child: ListView.separated(

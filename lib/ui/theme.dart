@@ -39,7 +39,7 @@ class MaterialTheme {
 
   const MaterialTheme(this.textTheme);
 
-  // ── Light ────────────────────────────────────────────────────────────────
+  // Light
 
   static ColorScheme lightScheme() {
     return const ColorScheme(
@@ -94,7 +94,7 @@ class MaterialTheme {
 
   ThemeData light() => theme(lightScheme());
 
-  // ── Light Medium Contrast ─────────────────────────────────────────────────
+  // Light Medium Contrast
 
   static ColorScheme lightMediumContrastScheme() {
     return const ColorScheme(
@@ -149,7 +149,7 @@ class MaterialTheme {
 
   ThemeData lightMediumContrast() => theme(lightMediumContrastScheme());
 
-  // ── Light High Contrast ───────────────────────────────────────────────────
+  // Light High Contrast
 
   static ColorScheme lightHighContrastScheme() {
     return const ColorScheme(
@@ -204,7 +204,7 @@ class MaterialTheme {
 
   ThemeData lightHighContrast() => theme(lightHighContrastScheme());
 
-  // ── Dark ─────────────────────────────────────────────────────────────────
+  // Dark
 
   static ColorScheme darkScheme() {
     return const ColorScheme(
@@ -259,7 +259,7 @@ class MaterialTheme {
 
   ThemeData dark() => theme(darkScheme());
 
-  // ── Dark Medium Contrast ──────────────────────────────────────────────────
+  // Dark Medium Contrast
 
   static ColorScheme darkMediumContrastScheme() {
     return const ColorScheme(
@@ -314,7 +314,7 @@ class MaterialTheme {
 
   ThemeData darkMediumContrast() => theme(darkMediumContrastScheme());
 
-  // ── Dark High Contrast ────────────────────────────────────────────────────
+  // Dark High Contrast
 
   static ColorScheme darkHighContrastScheme() {
     return const ColorScheme(
@@ -369,7 +369,7 @@ class MaterialTheme {
 
   ThemeData darkHighContrast() => theme(darkHighContrastScheme());
 
-  // ── Base theme builder ────────────────────────────────────────────────────
+  // Base theme builder
 
   ThemeData theme(ColorScheme colorScheme) => ThemeData(
     useMaterial3: true,

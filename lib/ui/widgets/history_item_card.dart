@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/screens/library/media_details_screen.dart';
-import 'package:krate/ui/widgets/recent_media_row_card.dart';
+import 'package:krate/ui/widgets/recent_media_card.dart';
 
 class HistoryItemCard extends ConsumerWidget {
   final Map<String, dynamic> row;
@@ -38,7 +38,7 @@ class HistoryItemCard extends ConsumerWidget {
       }
     }
 
-    return RecentMediaRowCard(
+    return RecentMediaCard(
       title: title,
       subtitle: subtitle,
       tagText: dateText.isNotEmpty ? 'Watched $dateText' : null,
@@ -62,6 +62,7 @@ class HistoryItemCard extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Progress Bar
               LinearProgressIndicator(
                 value: progress.durationMs > 0
                     ? progress.positionMs / progress.durationMs
@@ -71,6 +72,7 @@ class HistoryItemCard extends ConsumerWidget {
                 color: isFinished ? theme.colorScheme.primary : null,
               ),
               const SizedBox(height: 4),
+              // Time Remaining Text
               Text(
                 isFinished ? 'Completed' : '$minLeft mins left',
                 style: theme.textTheme.labelSmall?.copyWith(
@@ -83,7 +85,7 @@ class HistoryItemCard extends ConsumerWidget {
           );
         },
         loading: () => const LinearProgressIndicator(minHeight: 4),
-        error: (_, __) => const SizedBox.shrink(),
+        error: (error, stackTrace) => const SizedBox.shrink(),
       ),
     );
   }

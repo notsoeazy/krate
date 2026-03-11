@@ -85,7 +85,7 @@ class _StorageSetupScreenState extends ConsumerState<StorageSetupScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Icon in a surface container circle
+                // Storage Icon
                 CircleAvatar(
                   radius: 52,
                   backgroundColor: theme.colorScheme.primaryContainer,
@@ -96,6 +96,7 @@ class _StorageSetupScreenState extends ConsumerState<StorageSetupScreen> {
                   ),
                 ),
                 const SizedBox(height: 32),
+                // Welcome Text
                 Text(
                   'Welcome to Krate',
                   style: theme.textTheme.headlineMedium?.copyWith(
@@ -112,10 +113,10 @@ class _StorageSetupScreenState extends ConsumerState<StorageSetupScreen> {
                   ),
                 ),
                 const SizedBox(height: 48),
+                // Actions
                 if (_isLoading)
                   const CircularProgressIndicator()
                 else
-                  // FilledButton is the M3 primary action button
                   FilledButton.icon(
                     onPressed: _pickDirectory,
                     icon: const Icon(Icons.folder_open_outlined),

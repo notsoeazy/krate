@@ -139,7 +139,7 @@ class VaultSyncService {
     final metadataFile = File('${pod.path}/$kMetadataFileName');
     if (await metadataFile.exists()) {
       try {
-        final data = await metadataService.read(pod.path);
+        final data = await metadataService.read(metadataFile.path);
         content = data.content;
         episodes = data.episodes;
       } catch (e) {
@@ -224,9 +224,12 @@ class VaultSyncService {
 
     if (!isSeries) {
       // Movie
+      // Try to get existing episode from DB first to get its ID
+      final existingEpisode = await episodeRepo.getMovieEpisode(contentId);
+
       final movieEpisode = episodes.isNotEmpty
-          ? episodes.first
-          : (await episodeRepo.getMovieEpisode(contentId) ??
+          ? episodes.first.copyWith(id: existingEpisode?.id)
+          : (existingEpisode ??
               Episode.forMovie(contentId: contentId, videoPath: null));
 
       // Scan pod dir for any video file
@@ -320,7 +323,7 @@ class VaultSyncService {
     await contentRepo.update(updatedContent);
 
     for (final ep in syncedEpisodes) {
-      await episodeRepo.update(ep);
+      await episodeRepo.upsert(ep);
     }
 
     // 4. Update metadata.json (Scribe)

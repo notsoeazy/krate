@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:krate/utils/constants.dart';
 import 'package:krate/providers/providers.dart';
-import 'package:krate/ui/screens/import/media_details_import_screen.dart';
+import 'package:krate/ui/widgets/empty_state_view.dart';
+import 'package:krate/ui/widgets/search_result_tile.dart';
 
 class SearchImportScreen extends ConsumerStatefulWidget {
   const SearchImportScreen({super.key});
@@ -57,13 +57,11 @@ class _SearchImportScreenState extends ConsumerState<SearchImportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(title: const Text('Add Content')),
       body: Column(
         children: [
-          // M3 SearchBar
+          // Searchbar
           Padding(
             padding: const EdgeInsets.all(16),
             child: SearchBar(
@@ -89,107 +87,36 @@ class _SearchImportScreenState extends ConsumerState<SearchImportScreen> {
             ),
           ),
 
-          // ── States ────────────────────────────────────────────────────
+          // States
           if (_isLoading)
             const Expanded(child: Center(child: CircularProgressIndicator())),
 
           if (!_isLoading && _isOffline)
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.wifi_off_outlined,
-                      size: 64,
-                      color: theme.colorScheme.outlineVariant,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No internet connection',
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Searching requires an internet connection.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.outline,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
+            const Expanded(
+              child: EmptyStateView(
+                icon: Icons.wifi_off_outlined,
+                message: 'No internet connection',
+                secondaryMessage: 'Searching requires an internet connection.',
               ),
             ),
 
           if (!_isLoading && !_isOffline && _results.isEmpty)
             Expanded(
-              child: Center(
-                child: Text(
-                  _hasSearched
-                      ? 'No results found'
-                      : 'Search TMDB for movies or TV series',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.outline,
-                  ),
-                ),
+              child: EmptyStateView(
+                icon: _hasSearched ? Icons.search_off_outlined : Icons.search,
+                message: _hasSearched
+                    ? 'No results found'
+                    : 'Search TMDB for movies or TV series',
               ),
             ),
 
-          // ── Results ───────────────────────────────────────────────────
+          // Results
           if (!_isLoading && !_isOffline && _results.isNotEmpty)
             Expanded(
               child: ListView.builder(
                 itemCount: _results.length,
                 itemBuilder: (context, index) {
-                  final item = _results[index];
-                  final title = item['title'] ?? item['name'] ?? 'Unknown';
-                  final type = item['media_type'] == 'tv' ? 'Series' : 'Movie';
-                  final year =
-                      (item['release_date'] ?? item['first_air_date'] ?? '')
-                          .split('-')
-                          .first;
-
-                  return ListTile(
-                    leading: ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: item['poster_path'] != null
-                          ? Image.network(
-                              '$kTmdbImageBase/w92${item['poster_path']}',
-                              width: 48,
-                              height: 72,
-                              fit: BoxFit.cover,
-                            )
-                          : SizedBox(
-                              width: 48,
-                              height: 72,
-                              child: ColoredBox(
-                                color:
-                                    theme.colorScheme.surfaceContainerHighest,
-                                child: Icon(
-                                  Icons.movie_outlined,
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ),
-                    ),
-                    title: Text(title),
-                    subtitle: Text('$type • $year'),
-                    onTap: () {
-                      final tmdbId = item['id'];
-                      final isSeries = item['media_type'] == 'tv';
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => MediaDetailsImportScreen(
-                            tmdbId: tmdbId,
-                            type: isSeries
-                                ? ContentType.series
-                                : ContentType.movie,
-                          ),
-                        ),
-                      );
-                    },
-                  );
+                  return SearchResultTile(item: _results[index]);
                 },
               ),
             ),

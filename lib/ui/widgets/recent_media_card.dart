@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 
-class RecentMediaRowCard extends StatelessWidget {
+class RecentMediaCard extends StatelessWidget {
   final String title;
   final String? subtitle;
   final String? tagText;
@@ -9,7 +9,7 @@ class RecentMediaRowCard extends StatelessWidget {
   final Widget? progressIndicator;
   final VoidCallback onTap;
 
-  const RecentMediaRowCard({
+  const RecentMediaCard({
     super.key,
     required this.title,
     this.subtitle,
@@ -26,7 +26,7 @@ class RecentMediaRowCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       clipBehavior: Clip.antiAlias,
       elevation: 0,
-      color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
       child: InkWell(
         onTap: onTap,
         child: ConstrainedBox(
@@ -35,19 +35,18 @@ class RecentMediaRowCard extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Thumbnail
+                // Poster
                 SizedBox(
                   width: 84, // Slightly wider for 2:3 ratio against 120 height approx
                   child: localPosterPath != null && File(localPosterPath!).existsSync()
                       ? Image.file(
                           File(localPosterPath!),
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _buildPlaceholderIcon(),
+                          errorBuilder: (context, error, stackTrace) => _buildPlaceholderIcon(),
                         )
                       : _buildPlaceholderIcon(),
                 ),
                 
-                // Details
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.all(12),
@@ -56,6 +55,7 @@ class RecentMediaRowCard extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // Title
                         Text(
                           title,
                           style: theme.textTheme.titleMedium?.copyWith(
@@ -66,6 +66,7 @@ class RecentMediaRowCard extends StatelessWidget {
                         ),
                         if (subtitle != null && subtitle!.isNotEmpty) ...[
                           const SizedBox(height: 4),
+                          // Expanded description
                           Text(
                             subtitle!,
                             style: theme.textTheme.bodyMedium,
@@ -75,6 +76,7 @@ class RecentMediaRowCard extends StatelessWidget {
                         ],
                         if (tagText != null && tagText!.isNotEmpty) ...[
                           const SizedBox(height: 4),
+                          // Metadata Badge
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
@@ -94,6 +96,7 @@ class RecentMediaRowCard extends StatelessWidget {
                         ],
                         if (progressIndicator != null) ...[
                           const SizedBox(height: 12),
+                          // Progress bar
                           progressIndicator!,
                         ],
                       ],

@@ -4,10 +4,6 @@ import 'package:krate/data/models/episode.dart';
 import 'package:krate/providers/providers.dart';
 
 /// A single episode row displayed inside a [MediaDetailsScreen] season list.
-///
-/// Uses [ExpansionTile] with proper M3 styling — no `Theme.copyWith` divider
-/// hack.  The play action uses [IconButton.filled] to make the primary action
-/// visually prominent.
 class EpisodeTile extends ConsumerWidget {
   final Episode episode;
   final VoidCallback onPlay;
@@ -27,7 +23,6 @@ class EpisodeTile extends ConsumerWidget {
 
     return ExpansionTile(
       tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      // Remove dividers by setting a transparent border — no Theme wrapper.
       shape: const Border(),
       collapsedShape: const Border(),
       leading: _buildEpisodeIndicator(context, progressAsync, theme),
@@ -37,7 +32,7 @@ class EpisodeTile extends ConsumerWidget {
     );
   }
 
-  // ── Episode number indicator ────────────────────────────────────────────
+  // Episode Indicator
 
   Widget _buildEpisodeIndicator(
     BuildContext context,
@@ -61,6 +56,7 @@ class EpisodeTile extends ConsumerWidget {
           clipBehavior: Clip.antiAlias,
           child: Stack(
             children: [
+              // Progress Bar Overlay
               if (percentage > 0)
                 Align(
                   alignment: Alignment.bottomCenter,
@@ -74,6 +70,7 @@ class EpisodeTile extends ConsumerWidget {
                     ),
                   ),
                 ),
+              // Episode Number
               Center(
                 child: Text(
                   '${episode.episodeNumber ?? ''}',
@@ -114,7 +111,7 @@ class EpisodeTile extends ConsumerWidget {
     );
   }
 
-  // ── Title + metadata ────────────────────────────────────────────────────
+  // Title & Metadata
 
   Widget _buildEpisodeInfo(
     BuildContext context,
@@ -125,6 +122,7 @@ class EpisodeTile extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
+        // Episode Title
         Text(
           episode.title ?? 'Episode ${episode.episodeNumber}',
           style: theme.textTheme.bodyLarge?.copyWith(
@@ -137,6 +135,7 @@ class EpisodeTile extends ConsumerWidget {
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 2),
+        // Episode Metadata (Runtime, Status)
         progressAsync.when(
           data: (progress) {
             final runtimeStr = episode.runtime != null
@@ -169,7 +168,7 @@ class EpisodeTile extends ConsumerWidget {
     );
   }
 
-  // ── Play button ─────────────────────────────────────────────────────────
+  // Play Button
 
   Widget _buildPlayButton(BuildContext context, ThemeData theme) {
     if (!episode.hasFile) {
@@ -183,7 +182,6 @@ class EpisodeTile extends ConsumerWidget {
       );
     }
 
-    // FilledTonal IconButton = prominent but not as heavy as FilledButton
     return IconButton.filledTonal(
       icon: const Icon(Icons.play_arrow_rounded),
       onPressed: onPlay,
@@ -191,7 +189,7 @@ class EpisodeTile extends ConsumerWidget {
     );
   }
 
-  // ── Expanded description ─────────────────────────────────────────────────
+  // Expanded Details
 
   Widget _buildExpandedDetails(BuildContext context, ThemeData theme) {
     return Padding(
@@ -201,11 +199,13 @@ class EpisodeTile extends ConsumerWidget {
         children: [
           const Divider(),
           const SizedBox(height: 8),
+          // Description
           Text(
             episode.description ?? 'No description available.',
             style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 12),
+          // Air Date & File Path
           if (episode.airDate != null)
             _buildDetailRow(
               theme,

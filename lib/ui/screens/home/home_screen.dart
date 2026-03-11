@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/data/models/content.dart';
 import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/screens/library/media_details_screen.dart';
-import 'package:krate/ui/widgets/horizontal_media_row.dart';
+import 'package:krate/ui/widgets/media_card_row.dart';
 import 'package:krate/ui/widgets/continue_watching_row.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -114,7 +114,7 @@ class HomeScreen extends ConsumerWidget {
 
         // Recent Movies
         recentMovies.when(
-          data: (items) => HorizontalMediaRow(
+          data: (items) => MediaCardRow(
             title: 'Movies',
             items: items,
             onSeeAll: () {
@@ -133,7 +133,7 @@ class HomeScreen extends ConsumerWidget {
 
         // Recent Series
         recentSeries.when(
-          data: (items) => HorizontalMediaRow(
+          data: (items) => MediaCardRow(
             title: 'Series',
             items: items,
             onSeeAll: () {

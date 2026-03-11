@@ -93,9 +93,10 @@ class ContinueWatchingCard extends ConsumerWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
+              // Poster
               imageWidget,
 
-              // Dark gradient scrim from bottom for text readability
+              // Gradient Overlay
               Positioned.fill(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
@@ -112,7 +113,6 @@ class ContinueWatchingCard extends ConsumerWidget {
                 ),
               ),
 
-              // Title and Info Row
               Positioned(
                 left: 12,
                 bottom: 12,
@@ -121,6 +121,7 @@ class ContinueWatchingCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Title
                     Text(
                       content.title,
                       maxLines: 1,
@@ -130,6 +131,7 @@ class ContinueWatchingCard extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
+                    // Episode Info
                     Row(
                       children: [
                         (() {
@@ -179,7 +181,7 @@ class ContinueWatchingCard extends ConsumerWidget {
                 ),
               ),
 
-              // Play / Loading Button centered
+              // Play button
               Positioned.fill(
                 child: Center(
                   child: isLoading
@@ -214,8 +216,8 @@ class ContinueWatchingCard extends ConsumerWidget {
                 ),
               ),
 
-              // Progress Bar at the very bottom
               if (progress != null)
+                // Progress bar
                 Positioned(
                   left: 0,
                   right: 0,

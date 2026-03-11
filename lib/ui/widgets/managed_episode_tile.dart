@@ -5,9 +5,6 @@ import 'package:krate/providers/providers.dart';
 enum ManagedTileMode { normal, delete }
 
 /// A [ListTile]-based widget for displaying an episode in the management screen.
-///
-/// In delete mode it renders as a [CheckboxListTile] — the proper M3 pattern
-/// instead of a manual Checkbox shoehorned into a leading slot.
 class ManagedEpisodeTile extends StatelessWidget {
   final Episode episode;
   final ManagedTileMode mode;
@@ -32,7 +29,7 @@ class ManagedEpisodeTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // ── Delete mode → CheckboxListTile (proper M3 pattern) ──────────────────
+    // Delete Mode
     if (mode == ManagedTileMode.delete) {
       return CheckboxListTile(
         value: isSelected,
@@ -47,13 +44,15 @@ class ManagedEpisodeTile extends StatelessWidget {
                 : theme.colorScheme.onSurface.withValues(alpha: 0.38),
           ),
         ),
+        // File Status Subtitle
         subtitle: _buildSubtitle(theme),
+        // Episode Number Leading
         secondary: _buildEpisodeNumber(theme),
         controlAffinity: ListTileControlAffinity.leading,
       );
     }
 
-    // ── Normal mode → plain ListTile ─────────────────────────────────────
+    // Normal Mode
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: _buildEpisodeNumber(theme),
@@ -66,7 +65,9 @@ class ManagedEpisodeTile extends StatelessWidget {
               : theme.colorScheme.onSurface.withValues(alpha: 0.38),
         ),
       ),
+      // File Status Subtitle
       subtitle: _buildSubtitle(theme),
+      // Action Buttons
       trailing: _buildTrailing(theme),
     );
   }

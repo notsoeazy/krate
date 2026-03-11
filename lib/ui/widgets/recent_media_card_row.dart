@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:krate/data/models/content.dart';
-import 'package:krate/ui/widgets/continue_watching_card.dart';
+import 'package:krate/ui/widgets/recent_media_card.dart';
 
-class ContinueWatchingRow extends StatelessWidget {
+class RecentMediaCardRow extends StatelessWidget {
+  final String title;
   final List<Content> items;
   final VoidCallback onSeeAll;
+  final Function(Content) onItemSelected;
 
-  const ContinueWatchingRow({
+  const RecentMediaCardRow({
     super.key,
+    required this.title,
     required this.items,
     required this.onSeeAll,
+    required this.onItemSelected,
   });
 
   @override
@@ -28,7 +32,7 @@ class ContinueWatchingRow extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text('Continue Watching', style: theme.textTheme.titleMedium),
+              Text(title, style: theme.textTheme.titleMedium),
               TextButton(onPressed: onSeeAll, child: const Text('See all')),
             ],
           ),
@@ -41,8 +45,18 @@ class ContinueWatchingRow extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             itemCount: items.length,
             separatorBuilder: (_, _) => const SizedBox(width: 12),
-            itemBuilder: (context, index) =>
-                ContinueWatchingCard(content: items[index]),
+            itemBuilder: (context, index) {
+              final content = items[index];
+              return SizedBox(
+                width: 280,
+                child: RecentMediaCard(
+                  title: content.title,
+                  subtitle: content.releaseDate?.year.toString(),
+                  localPosterPath: content.localPosterPath ?? content.tmdbPosterPath,
+                  onTap: () => onItemSelected(content),
+                ),
+              );
+            },
           ),
         ),
       ],

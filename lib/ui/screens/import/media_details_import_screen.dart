@@ -5,6 +5,8 @@ import 'package:krate/utils/constants.dart';
 import 'package:krate/data/models/content.dart';
 import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/widgets/busy_overlay.dart';
+import 'package:krate/ui/widgets/media_import_preview.dart';
+import 'package:krate/ui/widgets/file_picker_tile.dart';
 import 'package:krate/ui/screens/import/series_episode_picker_screen.dart';
 
 class MediaDetailsImportScreen extends ConsumerStatefulWidget {
@@ -106,8 +108,6 @@ class _MediaDetailsImportScreenState
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(title: Text(_content!.title)),
       body: Stack(
@@ -117,70 +117,24 @@ class _MediaDetailsImportScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Preview ──────────────────────────────────────────────
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_content!.tmdbPosterPath != null)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          '$kTmdbImageBase/w185${_content!.tmdbPosterPath}',
-                          width: 110,
-                        ),
-                      ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _content!.title,
-                            style: theme.textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 8),
-                          if (_content!.releaseDate != null)
-                            Text(
-                              '${_content!.releaseDate!.year} • '
-                              '${widget.type.name.toUpperCase()}',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          const SizedBox(height: 12),
-                          Text(
-                            _content!.description ?? '',
-                            maxLines: 4,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                // Preview
+                MediaImportPreview(
+                  content: _content!,
+                  type: widget.type,
                 ),
 
                 const SizedBox(height: 32),
 
-                // ── File picker (movies) ──────────────────────────────────
+                // File Picker
                 if (widget.type == ContentType.movie) ...[
-                  Card(
-                    child: ListTile(
-                      title: const Text('Source File'),
-                      subtitle: Text(
-                        _selectedFilePath?.split('/').last ?? 'Not selected',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      leading: const Icon(Icons.file_open_outlined),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: _pickFile,
-                    ),
+                  FilePickerTile(
+                    selectedFilePath: _selectedFilePath,
+                    onTap: _pickFile,
                   ),
                   const SizedBox(height: 24),
                 ],
 
-                // ── Action ────────────────────────────────────────────────
+                // Actions
                 FilledButton.icon(
                   onPressed: _isBusy ? null : _onConfirmImport,
                   icon: Icon(

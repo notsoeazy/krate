@@ -56,7 +56,6 @@ class _StartupScreenState extends ConsumerState<StartupScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Just show the logo centered while scanning/loading
     return Scaffold(
       body: Center(
         child: Padding(
@@ -64,13 +63,14 @@ class _StartupScreenState extends ConsumerState<StartupScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Logo/Icon
+              // Logo
               Icon(
                 Icons.inventory_2_outlined,
                 size: 64,
                 color: theme.colorScheme.primary,
               ),
               const SizedBox(height: 24),
+              // App Name
               Text(
                 'Krate',
                 style: theme.textTheme.headlineMedium?.copyWith(
@@ -79,6 +79,7 @@ class _StartupScreenState extends ConsumerState<StartupScreen> {
                 ),
               ),
               const SizedBox(height: 48),
+              // Loading Spinner
               const CircularProgressIndicator(),
             ],
           ),

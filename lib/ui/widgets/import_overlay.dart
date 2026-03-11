@@ -7,9 +7,6 @@ import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/screens/import/search_import_screen.dart';
 
 /// Root overlay widget that wraps the main shell body.
-///
-/// Shows a [FloatingActionButton] to start an import, a notification chip
-/// while jobs are running, and an expandable job-status card.
 class ImportOverlay extends ConsumerStatefulWidget {
   final Widget child;
 
@@ -45,7 +42,7 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
             ),
           ),
 
-        // FAB + job panel at the bottom-right
+        // FAB + job panel at bottom-right
         Positioned(
           bottom: 16,
           right: 16,
@@ -64,12 +61,12 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
     );
   }
 
-  // ── FAB ────────────────────────────────────────────────────────────────
+  // FAB
 
   Widget _buildFAB(BuildContext context, int activeCount, bool hasJobs) {
     if (_isExpanded) return const SizedBox.shrink();
 
-    // Active import in progress — show a FAB.extended with a spinner
+    // Active import in progress (Spinner)
     if (activeCount > 0) {
       return FloatingActionButton.extended(
         onPressed: () => setState(() => _isExpanded = true),
@@ -85,7 +82,7 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
       );
     }
 
-    // Default: open import search
+    // Default FAB
     return FloatingActionButton.extended(
       onPressed: () => Navigator.of(context).push(
         MaterialPageRoute(builder: (context) => const SearchImportScreen()),
@@ -95,7 +92,7 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
     );
   }
 
-  // ── Job Panel (M3 Card) ────────────────────────────────────────────────
+  // Job Panel
 
   Widget _buildJobPanel(BuildContext context, List<ImportJob> jobs) {
     final theme = Theme.of(context);
@@ -159,6 +156,7 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
         children: [
           Row(
             children: [
+              // Media Type Icon
               Icon(
                 job.contentType == ContentType.series
                     ? Icons.tv
@@ -203,7 +201,7 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
   }
 }
 
-// ── Import Toast ─────────────────────────────────────────────────────────────
+// Import Toast
 
 /// Top-of-screen notification chip shown when a job completes or fails.
 class ImportToast extends ConsumerStatefulWidget {
@@ -254,7 +252,7 @@ class _ImportToastState extends ConsumerState<ImportToast> {
               ref.read(importToastProvider.notifier).dismiss();
               widget.onExpand();
             },
-            // Use M3 Card for the toast surface
+            // Toast Box
             child: Card(
               margin: EdgeInsets.zero,
               elevation: 2,
@@ -310,7 +308,7 @@ class _ImportToastState extends ConsumerState<ImportToast> {
   }
 }
 
-// ── Status Icon ───────────────────────────────────────────────────────────────
+// Status Icon
 
 class _StatusIcon extends StatelessWidget {
   final ImportJob job;
@@ -321,8 +319,8 @@ class _StatusIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    // Done Status
     if (job.status == ImportJobStatus.done) {
-      // CircleAvatar uses surface colour roles — no hardcoded green
       return CircleAvatar(
         radius: 12,
         backgroundColor: theme.colorScheme.tertiaryContainer,
@@ -334,6 +332,7 @@ class _StatusIcon extends StatelessWidget {
       );
     }
 
+    // Error Status
     if (job.status == ImportJobStatus.error) {
       return CircleAvatar(
         radius: 12,

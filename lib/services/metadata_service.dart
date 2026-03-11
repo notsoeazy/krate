@@ -143,7 +143,7 @@ class MetadataService {
           contentId: -1,
           videoPath: absPath,
           runtime: data['runtime'] as int?,
-          fileStatus: absPath != null ? FileStatus.missing : FileStatus.missing,
+          fileStatus: absPath != null ? FileStatus.ready : FileStatus.missing,
           createdAt: now,
           updatedAt: now,
         ),
