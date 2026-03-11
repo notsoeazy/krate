@@ -1,10 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 
-/// Full-screen busy overlay used during blocking async operations.
-///
-/// Uses [colorScheme.scrim] instead of a hardcoded colour so it always
-/// matches the active M3 colour scheme.
+// Full-screen busy overlay used during blocking async operations.
 class BusyOverlay extends StatelessWidget {
   final String message;
   final bool showBlur;

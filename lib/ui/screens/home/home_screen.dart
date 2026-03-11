@@ -102,6 +102,7 @@ class HomeScreen extends ConsumerWidget {
           data: (items) => ContinueWatchingRow(
             items: items,
             onSeeAll: () {
+              ref.read(recentsTabProvider.notifier).state = 0;
               ref.read(shellTabIndexProvider.notifier).state = 2;
             },
           ),
@@ -117,6 +118,7 @@ class HomeScreen extends ConsumerWidget {
           data: (items) => MediaCardRow(
             title: 'Movies',
             items: items,
+            showType: false,
             onSeeAll: () {
               ref.read(libraryTabProvider.notifier).state = 0;
               ref.read(shellTabIndexProvider.notifier).state = 1;
@@ -136,6 +138,7 @@ class HomeScreen extends ConsumerWidget {
           data: (items) => MediaCardRow(
             title: 'Series',
             items: items,
+            showType: false,
             onSeeAll: () {
               ref.read(libraryTabProvider.notifier).state = 1;
               ref.read(shellTabIndexProvider.notifier).state = 1;
@@ -155,4 +158,3 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 }
-

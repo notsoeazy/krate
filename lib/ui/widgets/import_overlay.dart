@@ -89,11 +89,12 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
       ),
       icon: const Icon(Icons.add),
       label: const Text('Import'),
+      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+      foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
     );
   }
 
   // Job Panel
-
   Widget _buildJobPanel(BuildContext context, List<ImportJob> jobs) {
     final theme = Theme.of(context);
 
@@ -202,8 +203,6 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
 }
 
 // Import Toast
-
-/// Top-of-screen notification chip shown when a job completes or fails.
 class ImportToast extends ConsumerStatefulWidget {
   final VoidCallback onExpand;
 
@@ -309,7 +308,6 @@ class _ImportToastState extends ConsumerState<ImportToast> {
 }
 
 // Status Icon
-
 class _StatusIcon extends StatelessWidget {
   final ImportJob job;
 

@@ -6,15 +6,13 @@ import 'package:krate/data/models/content.dart';
 import 'package:krate/data/models/episode.dart';
 import 'package:path/path.dart' as p;
 
-/// Handles reading and writing the `.metadata.json` scribe file.
-///
-/// The scribe is the **source of truth** — if the SQLite DB is ever lost,
-/// the entire library can be rebuilt by scanning for these files.
+// Handles reading and writing the .metadata.json scribe file.
+// The scribe is the source of truth — if the SQLite DB is ever lost,
+// the entire library can be rebuilt by scanning for these files.
 class MetadataService {
-  /// Writes (scribes) all content metadata to `<podPath>/.metadata.json`.
-  ///
-  /// All TMDB paths are preserved so that artwork can be re-downloaded later.
-  /// All episode video paths are stored as relative paths for portability.
+  // Writes (scribes) all content metadata to <podPath>/.metadata.json.
+  // All TMDB paths are preserved so that artwork can be re-downloaded later.
+  // All episode video paths are stored as relative paths for portability.
   Future<void> scribe({
     required Content content,
     required List<Episode> episodes,
@@ -71,9 +69,9 @@ class MetadataService {
     await file.writeAsString(const JsonEncoder.withIndent('  ').convert(data));
   }
 
-  /// Reads a `.metadata.json` file and returns reconstructed [Content] and
-  /// [Episode] objects with absolute paths. The [contentId] is a placeholder
-  /// (-1) since the DB has not been consulted yet.
+  // Reads a .metadata.json file and returns reconstructed [Content] and
+  // [Episode] objects with absolute paths. The [contentId] is a placeholder
+  // (-1) since the DB has not been consulted yet.
   Future<({Content content, List<Episode> episodes})> read(
     String metadataFilePath,
   ) async {

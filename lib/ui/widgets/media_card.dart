@@ -6,13 +6,6 @@ import 'package:krate/utils/constants.dart';
 import 'package:krate/data/models/content.dart';
 import 'package:krate/providers/providers.dart';
 
-/// Poster card used in grid and horizontal row views.
-///
-/// Replaces the ghost overlay with an M3-style badge system:
-/// - ❤ Favorite badge (top-left)
-/// - The poster always shows; file-status and progress shown as overlay badges
-/// - Series: episode count badge (e.g. "3/12") bottom-right
-/// - No-file badge shows a small icon for missing content (not a full overlay)
 class MediaCard extends ConsumerWidget {
   final Content content;
   final VoidCallback onTap;
@@ -57,7 +50,7 @@ class MediaCard extends ConsumerWidget {
                       child: _buildImage(context),
                     ),
                   ),
-
+                  // Favorite badge (top-left)
                   if (content.isFavorite)
                     Positioned(
                       top: 6,
@@ -68,7 +61,7 @@ class MediaCard extends ConsumerWidget {
                         onColor: theme.colorScheme.onError,
                       ),
                     ),
-
+                  // Content type abdge (top-riht)
                   if (showType)
                     Positioned(
                       top: 6,
@@ -230,9 +223,6 @@ class MediaCard extends ConsumerWidget {
   }
 }
 
-// Badge chip helper
-
-/// Small pill/icon badge used as poster overlay.
 class _BadgeChip extends StatelessWidget {
   final String? label;
   final IconData? icon;

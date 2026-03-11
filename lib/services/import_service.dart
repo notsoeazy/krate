@@ -13,12 +13,12 @@ import 'package:krate/services/storage_service.dart';
 import 'package:krate/services/tmdb_service.dart';
 import 'package:uuid/uuid.dart';
 
-/// Callback used to report job progress updates.
+// Callback used to report job progress updates.
 typedef OnJobUpdate = void Function(ImportJob job);
 
-/// Orchestrates all Krate data operations:
-/// - **Scouting**: fetch TMDB metadata, download artwork, scribe DB + metadata (requires internet)
-/// - **Linking**: pick local media files and move them into the Vault (offline-capable)
+// Orchestrates all Krate data operations:
+// - Scouting: fetch TMDB metadata, download artwork, scribe DB + metadata (requires internet)
+// - Linking: pick local media files and move them into the Vault (offline-capable)
 class ImportService {
   final ContentRepository _contentRepo;
   final EpisodeRepository _episodeRepo;
@@ -161,7 +161,9 @@ class ImportService {
 
     try {
       final movieData = await _tmdbService.getMovieDetails(content.tmdbId!);
-      onUpdate(job.copyWith(currentStep: 'Downloading artwork...', progress: 0.3));
+      onUpdate(
+        job.copyWith(currentStep: 'Downloading artwork...', progress: 0.3),
+      );
 
       final artwork = await _artworkService.downloadArtwork(
         tmdbPosterPath: movieData['poster_path'] as String?,
@@ -182,20 +184,32 @@ class ImportService {
 
       final existingEp = await _episodeRepo.getMovieEpisode(content.id!);
       if (existingEp != null) {
-        await _episodeRepo.update(existingEp.copyWith(runtime: updatedContent.runtime));
+        await _episodeRepo.update(
+          existingEp.copyWith(runtime: updatedContent.runtime),
+        );
       }
 
-      onUpdate(job.copyWith(currentStep: 'Scribing metadata...', progress: 0.8));
+      onUpdate(
+        job.copyWith(currentStep: 'Scribing metadata...', progress: 0.8),
+      );
       await _syncContentMetadata(content.id!);
 
-      onUpdate(job.copyWith(status: ImportJobStatus.done, progress: 1.0, currentStep: 'Done'));
+      onUpdate(
+        job.copyWith(
+          status: ImportJobStatus.done,
+          progress: 1.0,
+          currentStep: 'Done',
+        ),
+      );
     } catch (e) {
-      onUpdate(job.copyWith(status: ImportJobStatus.error, error: e.toString()));
+      onUpdate(
+        job.copyWith(status: ImportJobStatus.error, error: e.toString()),
+      );
       rethrow;
     }
   }
 
-  // Movie Rescan (Legacy wrapper)
+  // Movie Rescan
   Future<void> rescanMovie({
     required Content content,
     required OnJobUpdate onUpdate,
@@ -386,7 +400,9 @@ class ImportService {
 
     try {
       final seriesData = await _tmdbService.getSeriesDetails(content.tmdbId!);
-      onUpdate(job.copyWith(currentStep: 'Downloading artwork...', progress: 0.2));
+      onUpdate(
+        job.copyWith(currentStep: 'Downloading artwork...', progress: 0.2),
+      );
 
       final artwork = await _artworkService.downloadArtwork(
         tmdbPosterPath: seriesData['poster_path'] as String?,
@@ -408,34 +424,58 @@ class ImportService {
       int processedSeasons = 0;
       for (int s = 1; s <= updatedContent.totalSeasons; s++) {
         try {
-          final seasonData = await _tmdbService.getSeasonDetails(content.tmdbId!, s);
+          final seasonData = await _tmdbService.getSeasonDetails(
+            content.tmdbId!,
+            s,
+          );
           final epList = (seasonData['episodes'] as List?) ?? [];
           for (final eData in epList) {
             final epData = eData as Map<String, dynamic>;
             final epNum = epData['episode_number'] as int? ?? 0;
-            final existing = await _episodeRepo.getSeriesEpisode(content.id!, s, epNum);
+            final existing = await _episodeRepo.getSeriesEpisode(
+              content.id!,
+              s,
+              epNum,
+            );
             final updated = Episode.fromTmdbEpisode(epData, content.id!);
             if (existing == null) {
               await _episodeRepo.insert(updated);
             } else {
-              await _episodeRepo.update(updated.copyWith(
-                id: existing.id,
-                videoPath: existing.videoPath,
-                fileStatus: existing.fileStatus,
-              ));
+              await _episodeRepo.update(
+                updated.copyWith(
+                  id: existing.id,
+                  videoPath: existing.videoPath,
+                  fileStatus: existing.fileStatus,
+                ),
+              );
             }
           }
         } catch (_) {}
         processedSeasons++;
-        onUpdate(job.copyWith(progress: 0.2 + (processedSeasons / updatedContent.totalSeasons) * 0.7));
+        onUpdate(
+          job.copyWith(
+            progress:
+                0.2 + (processedSeasons / updatedContent.totalSeasons) * 0.7,
+          ),
+        );
       }
 
-      onUpdate(job.copyWith(currentStep: 'Scribing metadata...', progress: 0.95));
+      onUpdate(
+        job.copyWith(currentStep: 'Scribing metadata...', progress: 0.95),
+      );
       await _syncContentMetadata(content.id!);
 
-      onUpdate(job.copyWith(status: ImportJobStatus.done, progress: 1.0, currentStep: 'Done'));
+      onUpdate(
+        job.copyWith(
+          status: ImportJobStatus.done,
+          progress: 1.0,
+          currentStep: 'Done',
+        ),
+      );
     } catch (e) {
-      onUpdate(job.copyWith(status: ImportJobStatus.error, error: e.toString()));
+      onUpdate(
+        job.copyWith(status: ImportJobStatus.error, error: e.toString()),
+      );
       rethrow;
     }
   }
@@ -447,7 +487,7 @@ class ImportService {
   }) => fetchMetadataSeries(content: content, onUpdate: onUpdate);
 
   // Linking moves local media into the Vault (offline-capable)
-  // Links (moves) multiple local media files to existing series episodes.
+  // Links multiple local media files to existing series episodes.
   Future<void> linkEpisodes({
     required Content content,
     required Map<int, String> episodeFiles, // episodeId -> filePath
@@ -697,18 +737,43 @@ class ImportService {
     await destination.parent.create(recursive: true);
 
     try {
+      // First attempt: Instant rename (zero-copy)
       if (await destination.exists()) await destination.delete();
       await source.rename(dest);
       onProgress?.call(1.0);
+      debugPrint('[ImportService] File renamed: $src -> $dest');
       return;
-    } catch (_) {}
+    } catch (e) {
+      // If rename fails (e.g. OS Error 18: Cross-device link), fallback to copy.
+      // This is expected when moving from app cache (internal) to vault (external).
+      final isCrossDevice =
+          e is FileSystemException && e.osError?.errorCode == 18;
+      debugPrint(
+        '[ImportService] Rename failed (${isCrossDevice ? 'cross-device' : 'unexpected'}), falling back to copy: $e',
+      );
+    }
 
+    // Fallback: Copy and then delete source
+    onProgress?.call(0.0);
     await _copyWithProgress(source, destination, onProgress);
+
+    // Cleanup source if it's from a temporary/cache location
     final isCacheFile =
         src.contains('/cache/') ||
         src.contains('/tmp/') ||
-        src.contains('com.android.providers.downloads.documents');
-    if (isCacheFile) await source.delete();
+        src.contains('com.android.providers.downloads.documents') ||
+        src.contains(
+          'content://',
+        ); // Android content URIs are usually transient
+
+    if (isCacheFile) {
+      try {
+        await source.delete();
+        debugPrint('[ImportService] Source cache file deleted: $src');
+      } catch (e) {
+        debugPrint('[ImportService] Could not delete source cache file: $e');
+      }
+    }
   }
 
   Future<void> _copyWithProgress(
@@ -718,16 +783,52 @@ class ImportService {
   ) async {
     final total = await src.length();
     int copied = 0;
+
+    // Use a larger buffer for massive files (e.g. 4GB+) to improve throughput
     final reader = src.openRead();
-    final writer = dest.openWrite();
+    final writer = dest.openWrite(mode: FileMode.write);
+
     try {
       await for (final chunk in reader) {
         writer.add(chunk);
         copied += chunk.length;
-        if (total > 0) onProgress?.call(copied / total);
+
+        // Throttle progress updates to avoid UI jank with massive files
+        if (total > 0 && (copied % (10 * 1024 * 1024) == 0 || copied == total)) {
+          onProgress?.call(copied / total);
+        }
       }
+      // Ensure all data is flushed
+      await writer.flush();
+    } catch (e) {
+      debugPrint('[ImportService] Copy failed: $e');
+      rethrow;
     } finally {
       await writer.close();
+    }
+
+    // Final verification of size
+    final destSize = await dest.length();
+    if (destSize != total) {
+      throw FileSystemException(
+        'Copy size mismatch. Expected $total, got $destSize',
+        dest.path,
+      );
+    }
+  }
+
+  // Cleans up leftovers from failed/crashed import processes.
+  // Resets DB entries stuck in 'importing' status.
+  // Wipes the app's temporary/cache directory.
+  Future<void> cleanupFailedImports() async {
+    debugPrint('[ImportService] Running startup cleanup...');
+    try {
+      await _contentRepo.resetImportingStatus();
+      await _episodeRepo.resetImportingStatus();
+      await _storageService.cleanTemporaryDirectory();
+      debugPrint('[ImportService] Cleanup complete.');
+    } catch (e) {
+      debugPrint('[ImportService] Cleanup failed: $e');
     }
   }
 }

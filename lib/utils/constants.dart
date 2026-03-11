@@ -1,17 +1,17 @@
-/// Core enums and application-level constants for Krate.
+// Core enums and application-level constants for Krate.
 library;
 
-/// The type of media content.
+// The type of media content.
 enum ContentType { movie, series }
 
-/// The file availability status of a content item or episode.
+// The file availability status of a content item or episode.
 enum FileStatus {
   ready, // Media file is present and playable
   missing, // Media file is missing/not exist
   importing, // Media file is being imported
 }
 
-/// Status of an in-flight import job.
+// Status of an in-flight import job.
 enum ImportJobStatus { queued, running, done, error }
 
 // Vault File & Folder Name Constants
@@ -35,8 +35,5 @@ const kMetadataSchemaVersion = 2;
 const kFinishedThreshold = 0.92;
 
 // Typography — Google Fonts family names
-/// Font used for body text, labels, and captions.
 const kBodyFont = 'Inter';
-
-/// Font used for display text, headings, and titles.
 const kDisplayFont = 'Inter';

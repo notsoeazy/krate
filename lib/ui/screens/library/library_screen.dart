@@ -115,11 +115,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
             type: ContentType.movie,
             query: _searchQuery,
             onRefresh: _refresh,
+            showType: true,
           ),
           ContentGrid(
             type: ContentType.series,
             query: _searchQuery,
             onRefresh: _refresh,
+            showType: true,
           ),
         ],
       ),

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/data/models/episode.dart';
 import 'package:krate/providers/providers.dart';
 
-/// A single episode row displayed inside a [MediaDetailsScreen] season list.
 class EpisodeTile extends ConsumerWidget {
   final Episode episode;
   final VoidCallback onPlay;
@@ -33,7 +32,6 @@ class EpisodeTile extends ConsumerWidget {
   }
 
   // Episode Indicator
-
   Widget _buildEpisodeIndicator(
     BuildContext context,
     AsyncValue<dynamic> progressAsync,
@@ -112,7 +110,6 @@ class EpisodeTile extends ConsumerWidget {
   }
 
   // Title & Metadata
-
   Widget _buildEpisodeInfo(
     BuildContext context,
     AsyncValue<dynamic> progressAsync,
@@ -169,7 +166,6 @@ class EpisodeTile extends ConsumerWidget {
   }
 
   // Play Button
-
   Widget _buildPlayButton(BuildContext context, ThemeData theme) {
     if (!episode.hasFile) {
       return Padding(
@@ -190,7 +186,6 @@ class EpisodeTile extends ConsumerWidget {
   }
 
   // Expanded Details
-
   Widget _buildExpandedDetails(BuildContext context, ThemeData theme) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),

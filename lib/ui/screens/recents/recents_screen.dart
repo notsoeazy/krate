@@ -4,21 +4,26 @@ import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/widgets/recents_history_view.dart';
 import 'package:krate/ui/widgets/recents_content_grid.dart';
 
-class RecentsScreen extends StatefulWidget {
+class RecentsScreen extends ConsumerStatefulWidget {
   const RecentsScreen({super.key});
 
   @override
-  State<RecentsScreen> createState() => _RecentsScreenState();
+  ConsumerState<RecentsScreen> createState() => _RecentsScreenState();
 }
 
-class _RecentsScreenState extends State<RecentsScreen>
+class _RecentsScreenState extends ConsumerState<RecentsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    final initialTab = ref.read(recentsTabProvider);
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: initialTab,
+    );
   }
 
   @override
@@ -29,6 +34,13 @@ class _RecentsScreenState extends State<RecentsScreen>
 
   @override
   Widget build(BuildContext context) {
+    // React to Home "See All" taps even when mounted in IndexedStack
+    ref.listen<int>(recentsTabProvider, (_, next) {
+      if (_tabController.index != next) {
+        _tabController.animateTo(next);
+      }
+    });
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Recents'),
@@ -77,5 +89,3 @@ class _RecentsScreenState extends State<RecentsScreen>
     );
   }
 }
-
-

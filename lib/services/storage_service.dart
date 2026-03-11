@@ -5,26 +5,23 @@ import 'package:krate/utils/constants.dart';
 import 'package:krate/utils/errors.dart';
 import 'package:krate/data/models/content.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:krate/utils/extensions.dart';
 
 enum VaultStatus { ok, rootMissing, noPermission }
 
-/// Manages the user-selected storage root and the on-disk vault structure.
-///
-/// The vault lives at:
-///   `<userRoot>/krate_vault/movies/`
-///   `<userRoot>/krate_vault/series/`
-///
-/// The SQLite database is stored separately in the OS app-data directory.
+// Manages the user-selected storage root and the on-disk vault structure.
+// The vault lives at:
+//   `<userRoot>/krate_vault/movies/`
+//   `<userRoot>/krate_vault/series/`
+// The SQLite database is stored separately in the OS app-data directory.
 class StorageService {
   static const _rootKey = 'krate_storage_root';
 
-  // ---------------------------------------------------------------------------
   // Root setup & verification
-  // ---------------------------------------------------------------------------
 
-  /// Persists [path] as the storage root after verifying write access
-  /// and creating the vault folder structure.
+  // Persists [path] as the storage root after verifying write access
+  // and creating the vault folder structure.
   Future<void> setRoot(String path) async {
     // Validate write permission
     final testFile = File(
@@ -55,10 +52,9 @@ class StorageService {
     await prefs.remove(_rootKey);
   }
 
-  /// Checks vault integrity and returns the appropriate [VaultStatus].
-  ///
-  /// Called on every app launch to decide whether to show the main shell
-  /// or redirect to [StorageSetupScreen].
+  // Checks vault integrity and returns the appropriate [VaultStatus].
+  // Called on every app launch to decide whether to show the main shell
+  // or redirect to [StorageSetupScreen].
   Future<VaultStatus> checkIntegrity() async {
     final root = await getRoot();
     if (root == null) return VaultStatus.rootMissing;
@@ -94,27 +90,22 @@ class StorageService {
     return VaultStatus.ok;
   }
 
-  // ---------------------------------------------------------------------------
-  // Path helpers (single source of truth for pod naming)
-  // ---------------------------------------------------------------------------
-
   Future<String> _vaultRoot() async {
     final root = await getRoot();
     if (root == null) throw StateError('Storage root not configured');
     return '$root/$kVaultFolderName';
   }
 
-  /// Returns the absolute path to the movies sub-directory.
+  // Returns the absolute path to the movies sub-directory.
   Future<String> getMoviesDir() async =>
       '${await _vaultRoot()}/$kMoviesDirName';
 
-  /// Returns the absolute path to the series sub-directory.
+  // Returns the absolute path to the series sub-directory.
   Future<String> getSeriesDir() async =>
       '${await _vaultRoot()}/$kSeriesDirName';
 
-  /// Computes and ensures the pod directory for [content] exists.
-  ///
-  /// Naming convention: `Title_Year_TMDBID`
+  // Computes and ensures the pod directory for [content] exists.
+  // Naming convention: `Title_Year_TMDBID`
   Future<String> ensurePodDir(Content content) async {
     final safeTitle = content.title.toSlug();
     final year = content.releaseDate?.year ?? 0;
@@ -130,7 +121,7 @@ class StorageService {
     return podDir.path;
   }
 
-  /// Creates the season sub-folder inside a series pod and returns its path.
+  // Creates the season sub-folder inside a series pod and returns its path.
   Future<String> ensureSeasonDir(String podPath, int seasonNumber) async {
     final seasonStr = 'Season_${seasonNumber.toString().padLeft(2, '0')}';
     final dir = Directory('$podPath/$seasonStr');
@@ -138,7 +129,7 @@ class StorageService {
     return dir.path;
   }
 
-  /// Returns the destination file path for a movie, preserving its original name.
+  // Returns the destination file path for a movie, preserving its original name.
   Future<String> movieFilePath(
     Content content,
     String podPath,
@@ -148,7 +139,7 @@ class StorageService {
     return '$podPath/$fileName';
   }
 
-  /// Returns the destination file path for a series episode, preserving its original name.
+  // Returns the destination file path for a series episode, preserving its original name.
   Future<String> episodeFilePath(
     Content content,
     String podPath,
@@ -158,15 +149,36 @@ class StorageService {
   ) async {
     final fileName = sourceFilePath.split(Platform.pathSeparator).last;
     final seasonDir = await ensureSeasonDir(podPath, season);
-    final episodeStr = '$kEpisodeDirPrefix${episode.toString().padLeft(2, '0')}';
+    final episodeStr =
+        '$kEpisodeDirPrefix${episode.toString().padLeft(2, '0')}';
     final episodeDir = Directory('$seasonDir/$episodeStr');
     await episodeDir.create(recursive: true);
     return '${episodeDir.path}/$fileName';
   }
 
-  // ---------------------------------------------------------------------------
   // Private helpers
-  // ---------------------------------------------------------------------------
+
+  // Wipes the app's temporary/cache directory.
+  // Useful for cleaning up orphans from failed imports or file picker leaks.
+  Future<void> cleanTemporaryDirectory() async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      if (await tempDir.exists()) {
+        await for (final entity in tempDir.list()) {
+          try {
+            await entity.delete(recursive: true);
+          } catch (e) {
+            debugPrint(
+              '[StorageService] Could not delete temp entity ${entity.path}: $e',
+            );
+          }
+        }
+        debugPrint('[StorageService] Temporary directory cleaned.');
+      }
+    } catch (e) {
+      debugPrint('[StorageService] Failed to clean temporary directory: $e');
+    }
+  }
 
   Future<void> _ensureVaultStructure(String root) async {
     await Directory(
@@ -176,5 +188,4 @@ class StorageService {
       '$root/$kVaultFolderName/$kSeriesDirName',
     ).create(recursive: true);
   }
-
 }

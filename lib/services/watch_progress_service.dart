@@ -19,7 +19,7 @@ class WatchProgressService {
        _episodeRepo = episodeRepo,
        _ref = ref;
 
-  /// Determines the best episode to resume for a given content item.
+  // Determines the best episode to resume for a given content item.
   Future<Episode?> getResumeEpisode(int contentId) async {
     final allEpisodes = await _episodeRepo.getByContentId(contentId);
     if (allEpisodes.isEmpty) return null;
@@ -31,7 +31,7 @@ class WatchProgressService {
       return allEpisodes.first; // No files, fallback to first metadata
     }
 
-    // 1. Check for most recently watched unfinished episode that is ready
+    // Check for most recently watched unfinished episode that is ready
     final inProgress = await _progressRepo.getInProgress(limit: 100);
     final contentProgress = inProgress.where(
       (row) => row['contentId'] == contentId,
@@ -43,7 +43,7 @@ class WatchProgressService {
       if (ep != null && ep.fileStatus == FileStatus.ready) return ep;
     }
 
-    // 2. If nothing is in progress, find the next episode after the latest finished one
+    // If nothing is in progress, find the next episode after the latest finished one
     Episode? latestFinished;
     for (final ep in allEpisodes) {
       final progress = await _progressRepo.getByEpisodeId(ep.id!);
@@ -66,11 +66,11 @@ class WatchProgressService {
       if (latestFinished.fileStatus == FileStatus.ready) return latestFinished;
     }
 
-    // 3. Default to the first available ready episode
+    // Default to the first available ready episode
     return readyEpisodes.first;
   }
 
-  /// Saves or updates watch progress for an episode.
+  // Saves or updates watch progress for an episode.
   Future<void> saveProgress({
     required int contentId,
     required int episodeId,

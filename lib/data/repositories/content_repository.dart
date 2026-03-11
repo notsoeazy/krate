@@ -17,10 +17,26 @@ class ContentRepository {
 
   Future<int> upsert(Content content) async {
     final db = await _db.database;
-    return db.insert('content', {
-      ...content.toMap(),
-      'updatedAt': DateTime.now().toIso8601String(),
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+    Content? existing;
+    if (content.id != null) {
+      existing = await getById(content.id!);
+    } else if (content.tmdbId != null) {
+      existing = await getByTmdbId(content.tmdbId!);
+    }
+
+    if (existing != null) {
+      final id = existing.id!;
+      await db.update(
+        'content',
+        {...content.toMap(), 'updatedAt': DateTime.now().toIso8601String()},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      return id;
+    } else {
+      return await insert(content);
+    }
   }
 
   Future<int> update(Content content) async {
@@ -123,7 +139,7 @@ class ContentRepository {
     );
   }
 
-  /// Returns all items where [fileStatus] is not 'ready'.
+  // Returns all items where [fileStatus] is not 'ready'.
   Future<List<Content>> getGhosts() async {
     final db = await _db.database;
     final rows = await db.query(
@@ -132,5 +148,19 @@ class ContentRepository {
       whereArgs: [FileStatus.ready.name],
     );
     return rows.map(Content.fromMap).toList();
+  }
+
+  // Resets any items stuck in 'importing' status back to 'missing'.
+  Future<void> resetImportingStatus() async {
+    final db = await _db.database;
+    await db.update(
+      'content',
+      {
+        'fileStatus': FileStatus.missing.name,
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      where: 'fileStatus = ?',
+      whereArgs: [FileStatus.importing.name],
+    );
   }
 }

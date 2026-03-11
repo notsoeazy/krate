@@ -10,7 +10,7 @@ import 'package:krate/services/storage_service.dart';
 import 'package:krate/services/tmdb_service.dart';
 import 'package:krate/services/artwork_service.dart';
 
-/// One-pass scanner to reconcile the filesystem with the database and metadata.json.
+// One-pass scanner to reconcile the filesystem with the database and metadata.json.
 class VaultSyncService {
   final ContentRepository contentRepo;
   final EpisodeRepository episodeRepo;
@@ -87,15 +87,15 @@ class VaultSyncService {
     onProgress?.call(1.0);
   }
 
-  /// Sync a specific pod directory.
+  // Sync a specific pod directory.
   Future<void> syncPod(Directory pod) async {
     final tmdbId = _extractTmdbId(pod.path);
     if (tmdbId == null) return;
     await _syncPod(pod, tmdbId, pod.path.contains(kSeriesDirName));
   }
 
-  /// Quickly check if there are differences between the vault and the database.
-  /// Returns `true` if a sync is recommended.
+  // Quickly check if there are differences between the vault and the database.
+  // Returns `true` if a sync is recommended.
   Future<bool> scout() async {
     final root = await storageService.getRoot();
     if (root == null) return false;
@@ -131,7 +131,6 @@ class VaultSyncService {
   }
 
   Future<void> _syncPod(Directory pod, int tmdbId, bool isSeries) async {
-    // 1. Reconcile Metadata
     Content? content;
     List<Episode> episodes = [];
 
@@ -152,7 +151,7 @@ class VaultSyncService {
       // metadata.json was successfully parsed!
       // Check if we already have it in DB by TMDB ID
       final existingDbContent = await contentRepo.getByTmdbId(tmdbId);
-      
+
       if (existingDbContent != null) {
         // Exists in DB, we just grab its ID and ensure podPath is fresh
         content = existingDbContent.copyWith(podPath: pod.path);
@@ -167,7 +166,7 @@ class VaultSyncService {
       // metadata.json missing or corrupt. We must recover from DB or TMDB.
       debugPrint('[VaultSync] Recovering metadata for TMDB ID $tmdbId');
       content = await contentRepo.getByTmdbId(tmdbId);
-      
+
       if (content == null) {
         // Not in DB either - try fetching from TMDB (needs internet)
         try {
@@ -194,7 +193,6 @@ class VaultSyncService {
       }
     }
 
-    // 2. Comprehensive Integrity Check
     // Posters
     final posterFile = File('${pod.path}/$kPosterFileName');
     final backdropFile = File('${pod.path}/$kBackdropFileName');
@@ -230,7 +228,7 @@ class VaultSyncService {
       final movieEpisode = episodes.isNotEmpty
           ? episodes.first.copyWith(id: existingEpisode?.id)
           : (existingEpisode ??
-              Episode.forMovie(contentId: contentId, videoPath: null));
+                Episode.forMovie(contentId: contentId, videoPath: null));
 
       // Scan pod dir for any video file
       final videoFile = await _findAnyVideoFile(pod);
@@ -286,10 +284,12 @@ class VaultSyncService {
       for (final ep in updatedDbEpisodes) {
         final season = ep.seasonNumber ?? 1;
         final episodeNumber = ep.episodeNumber ?? 1;
-        
+
         final seasonStr = season.toString().padLeft(2, '0');
         final episodeStr = episodeNumber.toString().padLeft(2, '0');
-        final episodeDir = Directory('${pod.path}/Season_$seasonStr/$kEpisodeDirPrefix$episodeStr');
+        final episodeDir = Directory(
+          '${pod.path}/Season_$seasonStr/$kEpisodeDirPrefix$episodeStr',
+        );
 
         File? matchedFile;
         if (await episodeDir.exists()) {
@@ -300,7 +300,10 @@ class VaultSyncService {
         if (matchedFile != null) {
           anyReady = true;
           syncedEpisodes.add(
-            ep.copyWith(videoPath: matchedFile.path, fileStatus: FileStatus.ready),
+            ep.copyWith(
+              videoPath: matchedFile.path,
+              fileStatus: FileStatus.ready,
+            ),
           );
         } else {
           syncedEpisodes.add(
@@ -313,7 +316,6 @@ class VaultSyncService {
       );
     }
 
-    // 3. Persist Changes
     final existing = await contentRepo.getById(contentId);
     final updatedContent = content.copyWith(
       isFavorite: existing?.isFavorite ?? false,
@@ -326,23 +328,24 @@ class VaultSyncService {
       await episodeRepo.upsert(ep);
     }
 
-    // 4. Update metadata.json (Scribe)
     await metadataService.scribe(
       content: updatedContent,
       episodes: syncedEpisodes,
       podPath: pod.path,
     );
 
-    // If artwork was missing but we have internet, maybe download?
+    // If artwork was missing but we have internet, maybe download? Manual muna
     // For now, just ensure metadata.json is consistent with local disk.
   }
 
   Future<void> _markContentAsMissing(Content content) async {
-    await contentRepo.update(content.copyWith(
-      fileStatus: FileStatus.missing,
-      clearLocalPosterPath: true,
-      clearLocalBackdropPath: true,
-    ));
+    await contentRepo.update(
+      content.copyWith(
+        fileStatus: FileStatus.missing,
+        clearLocalPosterPath: true,
+        clearLocalBackdropPath: true,
+      ),
+    );
     final episodes = await episodeRepo.getByContentId(content.id!);
     for (final ep in episodes) {
       await episodeRepo.update(
@@ -372,5 +375,4 @@ class VaultSyncService {
     } catch (_) {}
     return null;
   }
-
 }

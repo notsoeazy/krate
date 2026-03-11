@@ -6,7 +6,7 @@ class WatchHistoryRepository {
 
   Future<void> record(WatchHistory history) async {
     final db = await _db.database;
-    
+
     // We only want ONE history row per Movie or Series.
     final existing = await db.query(
       'watch_history',
@@ -18,11 +18,12 @@ class WatchHistoryRepository {
     if (existing.isNotEmpty) {
       final id = existing.first['id'] as int;
       final oldDuration = existing.first['durationWatchedMs'] as int? ?? 0;
-      
+
       await db.update(
         'watch_history',
         {
-          'episodeId': history.episodeId, // Always update to the latest episode watched!
+          'episodeId':
+              history.episodeId, // Always update to the latest episode watched!
           'startedAt': history.startedAt.toIso8601String(),
           'finishedAt': history.finishedAt.toIso8601String(),
           'durationWatchedMs': oldDuration + history.durationWatchedMs,
@@ -36,7 +37,7 @@ class WatchHistoryRepository {
   }
 
   /// Returns all history rows joined with content info, newest first.
-  /// Groups by episodeId to ensure we only show the most recent watch session 
+  /// Groups by episodeId to ensure we only show the most recent watch session
   /// for a given episode/movie, preventing duplicates in the UI.
   Future<List<Map<String, dynamic>>> getAll({int limit = 100}) async {
     final db = await _db.database;
@@ -56,7 +57,6 @@ class WatchHistoryRepository {
   }
 
   /// Returns the list of content IDs that have been fully watched
-  /// (i.e., they have a finished watch_progress entry).
   Future<List<int>> getCompletedContentIds() async {
     final db = await _db.database;
     final rows = await db.rawQuery('''

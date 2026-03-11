@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:krate/providers/providers.dart';
+import 'package:krate/ui/screens/library/media_details_screen.dart';
 import 'package:krate/ui/screens/import/media_details_import_screen.dart';
 import 'package:krate/utils/constants.dart';
 
-class SearchResultTile extends StatelessWidget {
+class SearchResultTile extends ConsumerWidget {
   final Map<String, dynamic> item;
 
   const SearchResultTile({super.key, required this.item});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tmdbId = item['id'] as int;
+    final localContentAsync = ref.watch(contentByTmdbIdProvider(tmdbId));
     final theme = Theme.of(context);
     final title = item['title'] ?? item['name'] ?? 'Unknown';
     final type = item['media_type'] == 'tv' ? 'Series' : 'Movie';
@@ -39,9 +44,48 @@ class SearchResultTile extends StatelessWidget {
               ),
       ),
       title: Text(title),
-      subtitle: Text('$type • $year'),
+      subtitle: Row(
+        children: [
+          Text('$type • $year'),
+          localContentAsync.when(
+            data: (content) {
+              if (content == null) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'Imported',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onPrimaryContainer,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              );
+            },
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
+        ],
+      ),
       onTap: () {
-        final tmdbId = item['id'];
+        final localContent = localContentAsync.valueOrNull;
+        if (localContent != null) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) =>
+                  MediaDetailsScreen(contentId: localContent.id!),
+            ),
+          );
+          return;
+        }
+
         final isSeries = item['media_type'] == 'tv';
         Navigator.of(context).push(
           MaterialPageRoute(

@@ -7,6 +7,7 @@ class MediaCardRow extends StatelessWidget {
   final List<Content> items;
   final VoidCallback onSeeAll;
   final Function(Content) onItemSelected;
+  final bool showType;
 
   const MediaCardRow({
     super.key,
@@ -14,6 +15,7 @@ class MediaCardRow extends StatelessWidget {
     required this.items,
     required this.onSeeAll,
     required this.onItemSelected,
+    this.showType = false,
   });
 
   @override
@@ -50,6 +52,7 @@ class MediaCardRow extends StatelessWidget {
                 content: items[index],
                 onTap: () => onItemSelected(items[index]),
                 width: 120,
+                showType: showType,
               );
             },
           ),

@@ -6,7 +6,7 @@ import 'package:krate/data/models/content.dart';
 class WatchProgressRepository {
   final AppDatabase _db = AppDatabase.instance;
 
-  /// Upsert progress for a given episode.
+  // Upsert progress for a given episode.
   Future<void> save(WatchProgress progress) async {
     final db = await _db.database;
     await db.insert('watch_progress', {
@@ -26,8 +26,8 @@ class WatchProgressRepository {
     return rows.isEmpty ? null : WatchProgress.fromMap(rows.first);
   }
 
-  /// Returns all content IDs that have unfinished progress, ordered by
-  /// most recently watched. Used to populate "Continue Watching".
+  // Returns all content IDs that have unfinished progress, ordered by
+  // most recently watched. Used to populate "Continue Watching".
   Future<List<Map<String, dynamic>>> getInProgress({int limit = 20}) async {
     final db = await _db.database;
     return db.rawQuery(
@@ -44,8 +44,8 @@ class WatchProgressRepository {
     );
   }
 
-  /// Returns [Content] objects with in-progress episodes, joined with
-  /// basic watch info for display in the Continue Watching row.
+  // Returns [Content] objects with in-progress episodes, joined with
+  // basic watch info for display in the Continue Watching row.
   Future<List<Content>> getInProgressContent({int limit = 10}) async {
     final db = await _db.database;
     final rows = await db.rawQuery(

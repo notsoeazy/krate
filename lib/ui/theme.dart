@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-// ---------------------------------------------------------------------------
-// Text theme factory
-// ---------------------------------------------------------------------------
+// The theme is made with the help of this tool
+// https://material-foundation.github.io/material-theme-builder/
 
-/// Creates a [TextTheme] that blends a display font and a body font.
-///
-/// Pass short font-family names as recognised by the `google_fonts` package,
-/// e.g. `"Nunito"` / `"Roboto"`.
+// Text theme factory
 TextTheme createTextTheme(
   BuildContext context,
   String bodyFontString,
@@ -30,17 +26,13 @@ TextTheme createTextTheme(
   );
 }
 
-// ---------------------------------------------------------------------------
 // Material Theme
-// ---------------------------------------------------------------------------
-
 class MaterialTheme {
   final TextTheme textTheme;
 
   const MaterialTheme(this.textTheme);
 
   // Light
-
   static ColorScheme lightScheme() {
     return const ColorScheme(
       brightness: Brightness.light,
@@ -95,7 +87,6 @@ class MaterialTheme {
   ThemeData light() => theme(lightScheme());
 
   // Light Medium Contrast
-
   static ColorScheme lightMediumContrastScheme() {
     return const ColorScheme(
       brightness: Brightness.light,
@@ -150,7 +141,6 @@ class MaterialTheme {
   ThemeData lightMediumContrast() => theme(lightMediumContrastScheme());
 
   // Light High Contrast
-
   static ColorScheme lightHighContrastScheme() {
     return const ColorScheme(
       brightness: Brightness.light,
@@ -205,7 +195,6 @@ class MaterialTheme {
   ThemeData lightHighContrast() => theme(lightHighContrastScheme());
 
   // Dark
-
   static ColorScheme darkScheme() {
     return const ColorScheme(
       brightness: Brightness.dark,
@@ -260,7 +249,6 @@ class MaterialTheme {
   ThemeData dark() => theme(darkScheme());
 
   // Dark Medium Contrast
-
   static ColorScheme darkMediumContrastScheme() {
     return const ColorScheme(
       brightness: Brightness.dark,
@@ -315,7 +303,6 @@ class MaterialTheme {
   ThemeData darkMediumContrast() => theme(darkMediumContrastScheme());
 
   // Dark High Contrast
-
   static ColorScheme darkHighContrastScheme() {
     return const ColorScheme(
       brightness: Brightness.dark,
@@ -370,7 +357,6 @@ class MaterialTheme {
   ThemeData darkHighContrast() => theme(darkHighContrastScheme());
 
   // Base theme builder
-
   ThemeData theme(ColorScheme colorScheme) => ThemeData(
     useMaterial3: true,
     brightness: colorScheme.brightness,
@@ -386,10 +372,7 @@ class MaterialTheme {
   List<ExtendedColor> get extendedColors => [];
 }
 
-// ---------------------------------------------------------------------------
 // Extended colour helpers (for custom seed colours added to the palette)
-// ---------------------------------------------------------------------------
-
 class ExtendedColor {
   final Color seed, value;
   final ColorFamily light;

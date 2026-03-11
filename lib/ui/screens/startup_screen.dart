@@ -18,15 +18,20 @@ class _StartupScreenState extends ConsumerState<StartupScreen> {
   }
 
   Future<void> _scoutVault() async {
+    // Clean up any leftovers from crashed imports (temp files + DB status)
+    final importService = ref.read(importServiceProvider);
+    await importService.cleanupFailedImports();
+
+    // Scout the vault for differences
     final syncService = ref.read(vaultSyncServiceProvider);
     final needsSync = await syncService.scout();
-    
+
     if (mounted) {
       if (needsSync) {
         // Capture the provider container since this widget will be disposed
         // immediately after we push Replacement the ShellScreen.
         final container = ProviderScope.containerOf(context);
-        
+
         // Just notify the user via a global SnackBar that a sync might be needed.
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -54,36 +59,9 @@ class _StartupScreenState extends ConsumerState<StartupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Scaffold(
+    return const Scaffold(
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Logo
-              Icon(
-                Icons.inventory_2_outlined,
-                size: 64,
-                color: theme.colorScheme.primary,
-              ),
-              const SizedBox(height: 24),
-              // App Name
-              Text(
-                'Krate',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const SizedBox(height: 48),
-              // Loading Spinner
-              const CircularProgressIndicator(),
-            ],
-          ),
-        ),
+        child: CircularProgressIndicator(),
       ),
     );
   }

@@ -3,7 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:krate/utils/constants.dart';
 import 'package:krate/services/tmdb_service.dart';
 
-/// Downloads TMDB artwork (poster and backdrop) into a pod directory.
+// Downloads TMDB artwork (poster and backdrop) into a pod directory.
 class ArtworkService {
   final Dio _dio = Dio(
     BaseOptions(
@@ -12,10 +12,9 @@ class ArtworkService {
     ),
   );
 
-  /// Downloads poster and backdrop for [content] into [podPath].
-  ///
-  /// Returns a record with the absolute paths to the saved files, or null
-  /// for each if the download failed or the path was not provided.
+  // Downloads poster and backdrop for [content] into [podPath].
+  // Returns a record with the absolute paths to the saved files, or null
+  // for each if the download failed or the path was not provided.
   Future<({String? posterPath, String? backdropPath})> downloadArtwork({
     required String? tmdbPosterPath,
     required String? tmdbBackdropPath,

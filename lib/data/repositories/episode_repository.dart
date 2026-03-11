@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:krate/data/database/app_database.dart';
 import 'package:krate/data/models/episode.dart';
+import 'package:krate/utils/constants.dart';
 
 class EpisodeRepository {
   final AppDatabase _db = AppDatabase.instance;
@@ -16,10 +17,35 @@ class EpisodeRepository {
 
   Future<int> upsert(Episode ep) async {
     final db = await _db.database;
-    return db.insert('episodes', {
-      ...ep.toMap(),
-      'updatedAt': DateTime.now().toIso8601String(),
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    Episode? existing;
+    if (ep.id != null) {
+      existing = await getById(ep.id!);
+    } else {
+      if (ep.seasonNumber == null) {
+        // Movie episode
+        existing = await getMovieEpisode(ep.contentId);
+      } else {
+        // Series episode
+        existing = await getSeriesEpisode(
+          ep.contentId,
+          ep.seasonNumber!,
+          ep.episodeNumber!,
+        );
+      }
+    }
+
+    if (existing != null) {
+      final id = existing.id!;
+      await db.update(
+        'episodes',
+        {...ep.toMap(), 'updatedAt': DateTime.now().toIso8601String()},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      return id;
+    } else {
+      return await insert(ep);
+    }
   }
 
   Future<int> update(Episode ep) async {
@@ -60,7 +86,7 @@ class EpisodeRepository {
     return rows.map(Episode.fromMap).toList();
   }
 
-  /// Get the single movie episode row (seasonNumber IS NULL).
+  // Get the single movie episode row (seasonNumber IS NULL).
   Future<Episode?> getMovieEpisode(int contentId) async {
     final db = await _db.database;
     final rows = await db.query(
@@ -72,7 +98,7 @@ class EpisodeRepository {
     return rows.isEmpty ? null : Episode.fromMap(rows.first);
   }
 
-  /// Get a specific series episode by season + episode number.
+  // Get a specific series episode by season + episode number.
   Future<Episode?> getSeriesEpisode(
     int contentId,
     int season,
@@ -88,7 +114,7 @@ class EpisodeRepository {
     return rows.isEmpty ? null : Episode.fromMap(rows.first);
   }
 
-  /// Returns episodes grouped by season number.
+  // Returns episodes grouped by season number.
   Future<Map<int, List<Episode>>> getGroupedBySeasonForContent(
     int contentId,
   ) async {
@@ -101,7 +127,7 @@ class EpisodeRepository {
     return grouped;
   }
 
-  /// Returns the next unwatched episode after [currentEpisode] for series navigation.
+  // Returns the next unwatched episode after [currentEpisode] for series navigation.
   Future<Episode?> getNextEpisode(Episode currentEpisode) async {
     final db = await _db.database;
     // Try next episode in same season first
@@ -127,5 +153,19 @@ class EpisodeRepository {
       limit: 1,
     );
     return rows.isEmpty ? null : Episode.fromMap(rows.first);
+  }
+
+  // Resets any episodes stuck in 'importing' status back to 'missing'.
+  Future<void> resetImportingStatus() async {
+    final db = await _db.database;
+    await db.update(
+      'episodes',
+      {
+        'fileStatus': FileStatus.missing.name,
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      where: 'fileStatus = ?',
+      whereArgs: [FileStatus.importing.name],
+    );
   }
 }

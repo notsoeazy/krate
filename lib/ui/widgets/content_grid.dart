@@ -10,12 +10,14 @@ class ContentGrid extends ConsumerWidget {
   final ContentType type;
   final String query;
   final Future<void> Function() onRefresh;
+  final bool showType;
 
   const ContentGrid({
     super.key,
     required this.type,
     required this.query,
     required this.onRefresh,
+    this.showType = false,
   });
 
   @override
@@ -42,7 +44,6 @@ class ContentGrid extends ConsumerWidget {
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               children: [
-                // Empty State
                 SizedBox(
                   height: MediaQuery.of(context).size.height * 0.5,
                   child: EmptyStateView(
@@ -60,7 +61,6 @@ class ContentGrid extends ConsumerWidget {
         return RefreshIndicator(
           onRefresh: onRefresh,
           child: GridView.builder(
-            // Grid Layout
             padding: const EdgeInsets.all(16),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
@@ -78,6 +78,7 @@ class ContentGrid extends ConsumerWidget {
                         MediaDetailsScreen(contentId: filtered[index].id!),
                   ),
                 ),
+                showType: showType,
               );
             },
           ),

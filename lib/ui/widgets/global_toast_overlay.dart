@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/providers/providers.dart';
 
-/// A global overlay that sits above every route to show toast notifications.
+// A global overlay that sits above every route to show toast notifications.
 class GlobalToastOverlay extends ConsumerWidget {
   final Widget child;
 
@@ -10,14 +10,13 @@ class GlobalToastOverlay extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Watch both import toasts and a new generic toast provider (to be added)
     final importJob = ref.watch(importToastProvider);
     final vaultSyncState = ref.watch(vaultSyncProvider);
 
     return Stack(
       children: [
         child,
-        
+
         // Vault Sync Notification
         if (vaultSyncState.isSyncing)
           _ToastWrapper(
@@ -137,7 +136,9 @@ class _ImportToast extends StatelessWidget {
           children: [
             Icon(
               isError ? Icons.error_outline : Icons.info_outline,
-              color: isError ? theme.colorScheme.error : theme.colorScheme.primary,
+              color: isError
+                  ? theme.colorScheme.error
+                  : theme.colorScheme.primary,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -145,7 +146,12 @@ class _ImportToast extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(jobTitle, style: theme.textTheme.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text(
+                    jobTitle,
+                    style: theme.textTheme.titleSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   Text(
                     status,
                     style: theme.textTheme.labelSmall?.copyWith(

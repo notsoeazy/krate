@@ -2,10 +2,7 @@ import 'dart:io';
 import 'package:permission_handler/permission_handler.dart';
 
 class PermissionService {
-  /// Requests the necessary storage permissions for Android.
-  ///
-  /// On Android 11+ (API 30+), it requests [Permission.manageExternalStorage].
-  /// On older versions, it requests [Permission.storage].
+  // Requests the necessary storage permissions for Android.
   static Future<bool> requestStoragePermission() async {
     if (!Platform.isAndroid) return true;
 
@@ -13,9 +10,6 @@ class PermissionService {
       return true;
     }
 
-    // For Android 11 and above, we ideally want Manage External Storage
-    // but we can try basic storage first if thats what the user prefers.
-    // However, for a "Vault" app, Manage is best.
     final status = await Permission.manageExternalStorage.request();
 
     if (status.isGranted) {

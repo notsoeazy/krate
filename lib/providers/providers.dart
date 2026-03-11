@@ -24,8 +24,11 @@ import 'package:krate/services/watch_progress_service.dart';
 // UI State Providers
 final shellTabIndexProvider = StateProvider<int>((ref) => 0);
 
-/// Which tab the Library screen should show: 0 = Movies, 1 = Series.
+// Which tab the Library screen should show: 0 = Movies, 1 = Series.
 final libraryTabProvider = StateProvider<int>((ref) => 0);
+
+// Which tab the Recents screen should show: 0 = History, 1 = Added, 2 = Completed.
+final recentsTabProvider = StateProvider<int>((ref) => 0);
 
 // Infrastructure singletons
 final storageServiceProvider = Provider<StorageService>(
@@ -105,7 +108,9 @@ class ImportJobsNotifier extends StateNotifier<List<ImportJob>> {
     final isNew = index == -1;
     if (isNew) {
       state = [job, ...state];
-      _ref.read(importToastProvider.notifier).show(job, duration: const Duration(seconds: 3));
+      _ref
+          .read(importToastProvider.notifier)
+          .show(job, duration: const Duration(seconds: 3));
     } else {
       final updated = [...state];
       updated[index] = job;
@@ -116,7 +121,9 @@ class ImportJobsNotifier extends StateNotifier<List<ImportJob>> {
     if (job.status == ImportJobStatus.done ||
         job.status == ImportJobStatus.error) {
       _invalidateLibrary();
-      _ref.read(importToastProvider.notifier).show(job, duration: const Duration(seconds: 5));
+      _ref
+          .read(importToastProvider.notifier)
+          .show(job, duration: const Duration(seconds: 5));
     }
   }
 
@@ -315,13 +322,13 @@ class VaultSyncNotifier
     // Evict cached images
     imageCache.clear();
     imageCache.clearLiveImages();
-    
+
     // Invalidate specific content
     _ref.invalidate(contentProvider(contentId));
     _ref.invalidate(contentEpisodesProvider(contentId));
     _ref.invalidate(contentEpisodeCountProvider(contentId));
     _ref.invalidate(resumeEpisodeProvider(contentId));
-    
+
     // Invalidate all aggregated views just in case
     _ref.invalidate(moviesProvider);
     _ref.invalidate(seriesProvider);
@@ -396,6 +403,12 @@ final contentProvider = FutureProvider.family.autoDispose<Content?, int>((
 ) {
   return ref.read(contentRepoProvider).getById(id);
 });
+
+/// Watches a specific content item by its TMDB ID.
+final contentByTmdbIdProvider =
+    FutureProvider.family.autoDispose<Content?, int>((ref, tmdbId) {
+      return ref.read(contentRepoProvider).getByTmdbId(tmdbId);
+    });
 
 /// Watches episodes for a content item. Not autoDispose — cached in memory so
 /// tab switching is instant. Explicitly invalidated after any mutation.
