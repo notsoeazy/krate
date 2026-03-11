@@ -2,8 +2,6 @@ import 'dart:convert';
 import 'package:krate/utils/constants.dart';
 
 /// Represents a single piece of media content (movie or series).
-///
-/// This is an immutable value object. Use [copyWith] to produce modified copies.
 class Content {
   final int? id;
   final int? tmdbId;
@@ -15,33 +13,17 @@ class Content {
   final String? description;
   final List<String>? genres;
   final DateTime? releaseDate;
-
-  /// Runtime in minutes. For series, this is the average episode runtime.
   final int? runtime;
-
-  // Series-specific counts
   final int totalSeasons;
   final int totalEpisodes;
-
   final double voteAverage;
   final int voteCount;
-  final String? tmdbStatus; // e.g. 'Released', 'Ended', 'Returning Series'
-
-  /// TMDB relative poster path (e.g. "/abcdef.jpg"). Retained for future re-download.
+  final String? tmdbStatus;
   final String? tmdbPosterPath;
-
-  /// TMDB relative backdrop path. Retained for future re-download.
   final String? tmdbBackdropPath;
-
-  /// Absolute local path to the poster file inside the pod.
   final String? localPosterPath;
-
-  /// Absolute local path to the backdrop file inside the pod.
   final String? localBackdropPath;
-
-  /// Absolute path to this content's pod directory on disk.
   final String? podPath;
-
   final bool isFavorite;
   final FileStatus fileStatus;
   final DateTime createdAt;
@@ -75,10 +57,7 @@ class Content {
     required this.updatedAt,
   });
 
-  // ---------------------------------------------------------------------------
-  // DB serialisation
-  // ---------------------------------------------------------------------------
-
+  // DB serialization
   Map<String, dynamic> toMap() => {
     'tmdbId': tmdbId,
     'contentType': contentType.name,
@@ -146,10 +125,7 @@ class Content {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // Factory constructors from TMDB API maps
-  // ---------------------------------------------------------------------------
-
   factory Content.fromTmdbMovie(Map<String, dynamic> data) {
     final now = DateTime.now();
     final genres = (data['genres'] as List?)
@@ -211,12 +187,7 @@ class Content {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // Helpers
-  // ---------------------------------------------------------------------------
-
-  /// True when this content should display a "ghost" (file missing) badge.
-  /// A ghost is shown only when ALL associated episodes are missing their files.
   bool get isGhost => fileStatus == FileStatus.missing;
 
   Content copyWith({

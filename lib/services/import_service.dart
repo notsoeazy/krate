@@ -41,10 +41,7 @@ class ImportService {
        _storageService = storageService,
        _tmdbService = tmdbService;
 
-  // ---------------------------------------------------------------------------
-  // Scouting — downloads TMDB metadata & artwork (requires internet)
-  // ---------------------------------------------------------------------------
-
+  // Scouting downloads TMDB metadata & artwork (requires internet)
   Future<void> scoutMovie({
     required Content content,
     required String sourceFilePath,
@@ -143,10 +140,80 @@ class ImportService {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Series scouting
-  // ---------------------------------------------------------------------------
+  // Movie Rescan
+  Future<void> rescanMovie({
+    required Content content,
+    required OnJobUpdate onUpdate,
+  }) async {
+    if (content.tmdbId == null) throw const TmdbIdRequiredException();
+    if (!await _hasInternet()) throw const NoInternetException();
+    if (content.podPath == null) return;
 
+    final job = ImportJob(
+      id: const Uuid().v4(),
+      title: 'Rescanning ${content.title}',
+      contentType: ContentType.movie,
+      status: ImportJobStatus.running,
+      startedAt: DateTime.now(),
+    );
+
+    onUpdate(
+      job.copyWith(currentStep: 'Fetching latest data...', progress: 0.0),
+    );
+
+    try {
+      final movieData = await _tmdbService.getMovieDetails(content.tmdbId!);
+
+      onUpdate(
+        job.copyWith(currentStep: 'Downloading artwork...', progress: 0.2),
+      );
+      final artwork = await _artworkService.downloadArtwork(
+        tmdbPosterPath: movieData['poster_path'] as String?,
+        tmdbBackdropPath: movieData['backdrop_path'] as String?,
+        podPath: content.podPath!,
+        overwrite: true,
+      );
+
+      final updatedContent = Content.fromTmdbMovie(movieData).copyWith(
+        id: content.id,
+        localPosterPath: artwork.posterPath,
+        localBackdropPath: artwork.backdropPath,
+        podPath: content.podPath,
+        fileStatus: content.fileStatus,
+        updatedAt: DateTime.now(),
+      );
+      await _contentRepo.update(updatedContent);
+
+      // Update the single movie episode metadata as well
+      final existingEp = await _episodeRepo.getMovieEpisode(content.id!);
+      if (existingEp != null) {
+        await _episodeRepo.update(
+          existingEp.copyWith(runtime: updatedContent.runtime),
+        );
+      }
+
+      onUpdate(
+        job.copyWith(currentStep: 'Scribing metadata...', progress: 0.8),
+      );
+      await _syncContentMetadata(content.id!);
+
+      onUpdate(
+        job.copyWith(
+          status: ImportJobStatus.done,
+          progress: 1.0,
+          currentStep: 'Done',
+        ),
+      );
+    } catch (e, st) {
+      debugPrint('[ImportService] Movie rescan failed: $e\n$st');
+      onUpdate(
+        job.copyWith(status: ImportJobStatus.error, error: e.toString()),
+      );
+      rethrow;
+    }
+  }
+
+  // Series scouting
   Future<void> scoutSeries({
     required Content content,
     required Map<int, Map<int, String>> episodeFiles,
@@ -283,7 +350,7 @@ class ImportService {
         }
       }
 
-      await _syncContentStatus(contentId);
+      await _syncContentMetadata(contentId);
 
       onUpdate(
         job.copyWith(currentStep: 'Scribing metadata...', progress: 0.95),
@@ -310,13 +377,10 @@ class ImportService {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Rescan — refreshes TMDB metadata for existing content (requires internet)
-  // ---------------------------------------------------------------------------
-
-  /// Updates an already-scouted series with the latest TMDB metadata.
-  /// Preserves existing [videoPath] and [fileStatus] per episode.
-  /// Throws [NoInternetException] when offline.
+  // Rescan refreshes TMDB metadata for existing content (requires internet)
+  // Updates an already-scouted series with the latest TMDB metadata.
+  // Preserves existing videoPath and fileStatus per episode.
+  // Throws NoInternetException when offline.
   Future<void> rescanSeries({
     required Content content,
     required OnJobUpdate onUpdate,
@@ -339,12 +403,24 @@ class ImportService {
 
     try {
       final seriesData = await _tmdbService.getSeriesDetails(content.tmdbId!);
+
+      onUpdate(
+        job.copyWith(currentStep: 'Downloading artwork...', progress: 0.1),
+      );
+      final artwork = await _artworkService.downloadArtwork(
+        tmdbPosterPath: seriesData['poster_path'] as String?,
+        tmdbBackdropPath: seriesData['backdrop_path'] as String?,
+        podPath: content.podPath!,
+        overwrite: true,
+      );
+
       final updatedContent = Content.fromTmdbSeries(seriesData).copyWith(
         id: content.id,
-        localPosterPath: content.localPosterPath,
-        localBackdropPath: content.localBackdropPath,
+        localPosterPath: artwork.posterPath,
+        localBackdropPath: artwork.backdropPath,
         podPath: content.podPath,
         fileStatus: content.fileStatus,
+        updatedAt: DateTime.now(),
       );
       await _contentRepo.update(updatedContent);
 
@@ -398,12 +474,7 @@ class ImportService {
       onUpdate(
         job.copyWith(currentStep: 'Scribing metadata...', progress: 0.95),
       );
-      final allEps = await _episodeRepo.getByContentId(content.id!);
-      await _metadataService.scribe(
-        content: updatedContent,
-        episodes: allEps,
-        podPath: content.podPath!,
-      );
+      await _syncContentMetadata(content.id!);
 
       onUpdate(
         job.copyWith(
@@ -421,11 +492,8 @@ class ImportService {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Linking — moves local media into the Vault (offline-capable)
-  // ---------------------------------------------------------------------------
-
-  /// Links (moves) multiple local media files to existing series episodes.
+  // Linking moves local media into the Vault (offline-capable)
+  // Links (moves) multiple local media files to existing series episodes.
   Future<void> linkEpisodes({
     required Content content,
     required Map<int, String> episodeFiles, // episodeId -> filePath
@@ -483,7 +551,7 @@ class ImportService {
       onUpdate(
         job.copyWith(currentStep: 'Scribing metadata...', progress: 0.95),
       );
-      await _syncContentStatus(content.id!);
+      await _syncContentMetadata(content.id!);
 
       final allEpisodes = await _episodeRepo.getByContentId(content.id!);
       await _metadataService.scribe(
@@ -507,7 +575,7 @@ class ImportService {
     }
   }
 
-  /// Re-links (replaces) a single episode's media file.
+  // Re-links (replaces) a single episode's media file.
   Future<void> relinkEpisode({
     required Content content,
     required Episode episode,
@@ -538,7 +606,7 @@ class ImportService {
       if (await f.exists()) await f.delete();
     }
 
-    await _syncContentStatus(content.id!);
+    await _syncContentMetadata(content.id!);
 
     final allEps = await _episodeRepo.getByContentId(content.id!);
     await _metadataService.scribe(
@@ -548,10 +616,7 @@ class ImportService {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // Deletion
-  // ---------------------------------------------------------------------------
-
   Future<void> deleteContent(
     Content content, {
     bool deleteFiles = false,
@@ -578,7 +643,7 @@ class ImportService {
     );
 
     if (content.podPath != null) {
-      await _syncContentStatus(content.id!);
+      await _syncContentMetadata(content.id!);
       final allEps = await _episodeRepo.getByContentId(content.id!);
       await _metadataService.scribe(
         content: (await _contentRepo.getById(content.id!)) ?? content,
@@ -604,7 +669,7 @@ class ImportService {
     }
 
     if (content.podPath != null) {
-      await _syncContentStatus(content.id!);
+      await _syncContentMetadata(content.id!);
       final allEps = await _episodeRepo.getByContentId(content.id!);
 
       await _metadataService.scribe(
@@ -615,11 +680,8 @@ class ImportService {
     }
   }
 
-  // ---------------------------------------------------------------------------
   // Internal Helpers
-  // ---------------------------------------------------------------------------
-
-  /// Returns true if the device can reach the internet.
+  // Returns true if the device can reach the internet.
   Future<bool> _hasInternet() async {
     try {
       final result = await InternetAddress.lookup('api.themoviedb.org');
@@ -629,16 +691,44 @@ class ImportService {
     }
   }
 
-  /// Ensures the parent Content's fileStatus matches the availability of its episodes.
-  /// If at least one episode is 'ready', the content is 'ready'.
-  Future<void> _syncContentStatus(int contentId) async {
+  // Ensures parent Content's metadata (fileStatus, average runtime) stays in sync with its episodes
+  Future<void> _syncContentMetadata(int contentId) async {
     final episodes = await _episodeRepo.getByContentId(contentId);
     final anyReady = episodes.any((e) => e.fileStatus == FileStatus.ready);
-    final newStatus = anyReady ? FileStatus.ready : FileStatus.missing;
+    final isReady = anyReady ? FileStatus.ready : FileStatus.missing;
 
     final content = await _contentRepo.getById(contentId);
-    if (content != null && content.fileStatus != newStatus) {
-      await _contentRepo.update(content.copyWith(fileStatus: newStatus));
+    if (content == null) return;
+
+    int? avgRuntime;
+    if (content.contentType == ContentType.series) {
+      final runtimes = episodes
+          .map((e) => e.runtime)
+          .where((r) => r != null && r > 0)
+          .cast<int>()
+          .toList();
+
+      if (runtimes.isNotEmpty) {
+        avgRuntime = (runtimes.reduce((a, b) => a + b) / runtimes.length)
+            .round();
+      }
+    } else {
+      avgRuntime = content.runtime;
+    }
+
+    final updated = content.copyWith(fileStatus: isReady, runtime: avgRuntime);
+
+    if (content.fileStatus != isReady || content.runtime != avgRuntime) {
+      await _contentRepo.update(updated);
+
+      // Re-scribe metadata if podPath exists
+      if (content.podPath != null) {
+        await _metadataService.scribe(
+          content: updated,
+          episodes: episodes,
+          podPath: content.podPath!,
+        );
+      }
     }
   }
 

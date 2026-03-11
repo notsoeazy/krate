@@ -4,6 +4,10 @@ import 'package:krate/providers/providers.dart';
 
 enum ManagedTileMode { normal, delete }
 
+/// A [ListTile]-based widget for displaying an episode in the management screen.
+///
+/// In delete mode it renders as a [CheckboxListTile] — the proper M3 pattern
+/// instead of a manual Checkbox shoehorned into a leading slot.
 class ManagedEpisodeTile extends StatelessWidget {
   final Episode episode;
   final ManagedTileMode mode;
@@ -27,53 +31,62 @@ class ManagedEpisodeTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final hasFile = episode.hasFile;
 
+    // ── Delete mode → CheckboxListTile (proper M3 pattern) ──────────────────
+    if (mode == ManagedTileMode.delete) {
+      return CheckboxListTile(
+        value: isSelected,
+        onChanged: episode.hasFile ? onSelectedChanged : null,
+        enabled: episode.hasFile,
+        title: Text(
+          episode.title ?? 'Episode ${episode.episodeNumber}',
+          style: theme.textTheme.bodyLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: episode.hasFile
+                ? null
+                : theme.colorScheme.onSurface.withValues(alpha: 0.38),
+          ),
+        ),
+        subtitle: _buildSubtitle(theme),
+        secondary: _buildEpisodeNumber(theme),
+        controlAffinity: ListTileControlAffinity.leading,
+      );
+    }
+
+    // ── Normal mode → plain ListTile ─────────────────────────────────────
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: _buildLeading(theme),
+      leading: _buildEpisodeNumber(theme),
       title: Text(
         episode.title ?? 'Episode ${episode.episodeNumber}',
         style: theme.textTheme.bodyLarge?.copyWith(
           fontWeight: FontWeight.w600,
-          color: hasFile || stagedFile != null
+          color: episode.hasFile || stagedFile != null
               ? null
-              : theme.colorScheme.onSurface.withValues(alpha: 0.4),
+              : theme.colorScheme.onSurface.withValues(alpha: 0.38),
         ),
       ),
       subtitle: _buildSubtitle(theme),
       trailing: _buildTrailing(theme),
-      onTap: mode == ManagedTileMode.delete && episode.hasFile
-          ? () => onSelectedChanged?.call(!isSelected)
-          : null,
     );
   }
 
-  Widget _buildLeading(ThemeData theme) {
-    if (mode == ManagedTileMode.delete) {
-      return Checkbox(
-        value: isSelected,
-        onChanged: episode.hasFile ? onSelectedChanged : null,
-        activeColor: theme.colorScheme.primary,
-      );
-    }
-
+  Widget _buildEpisodeNumber(ThemeData theme) {
     return Container(
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Center(
-        child: Text(
-          '${episode.episodeNumber ?? ''}',
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: episode.hasFile
-                ? theme.colorScheme.primary
-                : theme.colorScheme.onSurface.withValues(alpha: 0.3),
-          ),
+      alignment: Alignment.center,
+      child: Text(
+        '${episode.episodeNumber ?? ''}',
+        style: theme.textTheme.titleSmall?.copyWith(
+          fontWeight: FontWeight.bold,
+          color: episode.hasFile
+              ? theme.colorScheme.primary
+              : theme.colorScheme.onSurface.withValues(alpha: 0.3),
         ),
       ),
     );
@@ -81,22 +94,23 @@ class ManagedEpisodeTile extends StatelessWidget {
 
   Widget? _buildSubtitle(ThemeData theme) {
     if (stagedFile != null) {
+      final isReplace = stagedFile!.isReplace;
       return Row(
         children: [
           Icon(
-            stagedFile!.isReplace ? Icons.swap_horiz : Icons.file_present,
+            isReplace ? Icons.swap_horiz : Icons.file_present,
             size: 14,
-            color: stagedFile!.isReplace
-                ? Colors.orange
+            color: isReplace
+                ? theme.colorScheme.secondary
                 : theme.colorScheme.primary,
           ),
           const SizedBox(width: 4),
           Expanded(
             child: Text(
-              '${stagedFile!.path.split('/').last}${stagedFile!.isReplace ? ' (Replace)' : ''}',
+              '${stagedFile!.path.split('/').last}${isReplace ? ' (Replace)' : ''}',
               style: theme.textTheme.labelSmall?.copyWith(
-                color: stagedFile!.isReplace
-                    ? Colors.orange
+                color: isReplace
+                    ? theme.colorScheme.secondary
                     : theme.colorScheme.primary,
                 fontWeight: FontWeight.bold,
               ),
@@ -128,10 +142,6 @@ class ManagedEpisodeTile extends StatelessWidget {
   }
 
   Widget _buildTrailing(ThemeData theme) {
-    if (mode == ManagedTileMode.delete) {
-      return const SizedBox.shrink();
-    }
-
     if (stagedFile != null) {
       return IconButton(
         icon: const Icon(Icons.close, size: 20),
@@ -141,10 +151,8 @@ class ManagedEpisodeTile extends StatelessWidget {
     }
 
     return IconButton(
-      icon: Icon(
-        episode.hasFile ? Icons.swap_horiz : Icons.add_circle_outline,
-        color: episode.hasFile ? theme.colorScheme.primary : null,
-      ),
+      icon: Icon(episode.hasFile ? Icons.swap_horiz : Icons.add_circle_outline),
+      color: episode.hasFile ? theme.colorScheme.primary : null,
       onPressed: onImport,
       tooltip: episode.hasFile ? 'Replace File' : 'Import File',
     );

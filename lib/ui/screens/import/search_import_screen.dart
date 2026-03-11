@@ -12,27 +12,32 @@ class SearchImportScreen extends ConsumerStatefulWidget {
 }
 
 class _SearchImportScreenState extends ConsumerState<SearchImportScreen> {
-  final TextEditingController _controller = TextEditingController();
+  final SearchController _searchController = SearchController();
+  final TextEditingController _textController = TextEditingController();
   List<Map<String, dynamic>> _results = [];
   bool _isLoading = false;
   bool _isOffline = false;
   bool _hasSearched = false;
 
-  void _onSearch() async {
-    if (_controller.text.isEmpty) return;
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _textController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _onSearch(String query) async {
+    if (query.isEmpty) return;
     setState(() {
       _isLoading = true;
       _isOffline = false;
       _hasSearched = true;
     });
     try {
-      final results = await ref
-          .read(tmdbServiceProvider)
-          .searchMulti(_controller.text);
+      final results = await ref.read(tmdbServiceProvider).searchMulti(query);
       if (mounted) setState(() => _results = results);
     } catch (e) {
       if (mounted) {
-        // Check if it's a connectivity issue
         final isOffline =
             e.toString().toLowerCase().contains('socket') ||
             e.toString().toLowerCase().contains('network') ||
@@ -52,26 +57,42 @@ class _SearchImportScreenState extends ConsumerState<SearchImportScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Add Content')),
       body: Column(
         children: [
+          // M3 SearchBar
           Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _controller,
-              onSubmitted: (_) => _onSearch(),
-              decoration: InputDecoration(
-                hintText: 'Search movies or series...',
-                suffixIcon: IconButton(
+            padding: const EdgeInsets.all(16),
+            child: SearchBar(
+              controller: _searchController,
+              hintText: 'Search movies or series…',
+              leading: _isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.search),
+              trailing: [
+                IconButton(
                   icon: const Icon(Icons.search),
-                  onPressed: _onSearch,
+                  onPressed: () => _onSearch(_searchController.text),
                 ),
+              ],
+              onSubmitted: _onSearch,
+              padding: const WidgetStatePropertyAll(
+                EdgeInsets.symmetric(horizontal: 16),
               ),
             ),
           ),
+
+          // ── States ────────────────────────────────────────────────────
           if (_isLoading)
             const Expanded(child: Center(child: CircularProgressIndicator())),
+
           if (!_isLoading && _isOffline)
             Expanded(
               child: Center(
@@ -81,18 +102,18 @@ class _SearchImportScreenState extends ConsumerState<SearchImportScreen> {
                     Icon(
                       Icons.wifi_off_outlined,
                       size: 64,
-                      color: Theme.of(context).colorScheme.outlineVariant,
+                      color: theme.colorScheme.outlineVariant,
                     ),
                     const SizedBox(height: 16),
                     Text(
                       'No internet connection',
-                      style: Theme.of(context).textTheme.titleMedium,
+                      style: theme.textTheme.titleMedium,
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Searching requires an internet connection.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.outline,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.outline,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -100,6 +121,7 @@ class _SearchImportScreenState extends ConsumerState<SearchImportScreen> {
                 ),
               ),
             ),
+
           if (!_isLoading && !_isOffline && _results.isEmpty)
             Expanded(
               child: Center(
@@ -107,12 +129,14 @@ class _SearchImportScreenState extends ConsumerState<SearchImportScreen> {
                   _hasSearched
                       ? 'No results found'
                       : 'Search TMDB for movies or TV series',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.outline,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.outline,
                   ),
                 ),
               ),
             ),
+
+          // ── Results ───────────────────────────────────────────────────
           if (!_isLoading && !_isOffline && _results.isNotEmpty)
             Expanded(
               child: ListView.builder(
@@ -127,13 +151,28 @@ class _SearchImportScreenState extends ConsumerState<SearchImportScreen> {
                           .first;
 
                   return ListTile(
-                    leading: item['poster_path'] != null
-                        ? Image.network(
-                            '$kTmdbImageBase/w92${item['poster_path']}',
-                            width: 50,
-                            fit: BoxFit.cover,
-                          )
-                        : const Icon(Icons.movie_outlined, size: 50),
+                    leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: item['poster_path'] != null
+                          ? Image.network(
+                              '$kTmdbImageBase/w92${item['poster_path']}',
+                              width: 48,
+                              height: 72,
+                              fit: BoxFit.cover,
+                            )
+                          : SizedBox(
+                              width: 48,
+                              height: 72,
+                              child: ColoredBox(
+                                color:
+                                    theme.colorScheme.surfaceContainerHighest,
+                                child: Icon(
+                                  Icons.movie_outlined,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                    ),
                     title: Text(title),
                     subtitle: Text('$type • $year'),
                     onTap: () {

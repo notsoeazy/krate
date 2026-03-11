@@ -20,6 +20,7 @@ class ArtworkService {
     required String? tmdbPosterPath,
     required String? tmdbBackdropPath,
     required String podPath,
+    bool overwrite = false,
   }) async {
     final dir = Directory(podPath);
     if (!await dir.exists()) await dir.create(recursive: true);
@@ -29,12 +30,14 @@ class ArtworkService {
           ? _download(
               TMDBService.posterUrl(tmdbPosterPath),
               '$podPath/$kPosterFileName',
+              overwrite: overwrite,
             )
           : Future.value(null),
       tmdbBackdropPath != null
           ? _download(
               TMDBService.backdropUrl(tmdbBackdropPath),
               '$podPath/$kBackdropFileName',
+              overwrite: overwrite,
             )
           : Future.value(null),
     ]);
@@ -42,10 +45,20 @@ class ArtworkService {
     return (posterPath: results[0], backdropPath: results[1]);
   }
 
-  Future<String?> _download(String url, String savePath) async {
+  Future<String?> _download(
+    String url,
+    String savePath, {
+    bool overwrite = false,
+  }) async {
     try {
       final file = File(savePath);
-      if (await file.exists()) return savePath; // already downloaded
+      if (await file.exists()) {
+        if (overwrite) {
+          await file.delete();
+        } else {
+          return savePath; // already downloaded
+        }
+      }
       await _dio.download(url, savePath);
       return savePath;
     } catch (_) {

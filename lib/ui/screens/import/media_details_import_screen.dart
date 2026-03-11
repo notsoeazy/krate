@@ -26,6 +26,7 @@ class _MediaDetailsImportScreenState
     extends ConsumerState<MediaDetailsImportScreen> {
   Content? _content;
   bool _isLoading = true;
+  bool _isBusy = false;
   String? _selectedFilePath;
 
   @override
@@ -56,8 +57,6 @@ class _MediaDetailsImportScreenState
     }
   }
 
-  bool _isBusy = false;
-
   Future<void> _pickFile() async {
     setState(() => _isBusy = true);
     try {
@@ -74,7 +73,6 @@ class _MediaDetailsImportScreenState
     if (_content == null) return;
 
     if (widget.type == ContentType.series) {
-      // Go to Episode Picker for series
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) =>
@@ -91,7 +89,6 @@ class _MediaDetailsImportScreenState
       return;
     }
 
-    // Trigger Import (Sync/Non-blocking from UI perspective)
     ref
         .read(importJobsProvider.notifier)
         .importMovie(
@@ -100,8 +97,6 @@ class _MediaDetailsImportScreenState
           sourceFilePath: _selectedFilePath!,
         );
 
-    // Immediate redirect to Home
-    // Pop back to root or trigger a refresh
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
@@ -120,8 +115,9 @@ class _MediaDetailsImportScreenState
           SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Preview Card
+                // ── Preview ──────────────────────────────────────────────
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -130,7 +126,7 @@ class _MediaDetailsImportScreenState
                         borderRadius: BorderRadius.circular(8),
                         child: Image.network(
                           '$kTmdbImageBase/w185${_content!.tmdbPosterPath}',
-                          width: 120,
+                          width: 110,
                         ),
                       ),
                     const SizedBox(width: 16),
@@ -145,7 +141,11 @@ class _MediaDetailsImportScreenState
                           const SizedBox(height: 8),
                           if (_content!.releaseDate != null)
                             Text(
-                              '${_content!.releaseDate!.year} • ${widget.type.name.toUpperCase()}',
+                              '${_content!.releaseDate!.year} • '
+                              '${widget.type.name.toUpperCase()}',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           const SizedBox(height: 12),
                           Text(
@@ -159,41 +159,49 @@ class _MediaDetailsImportScreenState
                     ),
                   ],
                 ),
+
                 const SizedBox(height: 32),
 
+                // ── File picker (movies) ──────────────────────────────────
                 if (widget.type == ContentType.movie) ...[
-                  const Divider(),
-                  ListTile(
-                    title: const Text('Source File'),
-                    subtitle: Text(_selectedFilePath ?? 'Not selected'),
-                    trailing: const Icon(Icons.file_open),
-                    onTap: _pickFile,
-                  ),
-                  const Divider(),
-                ],
-
-                const SizedBox(height: 32),
-                ElevatedButton(
-                  onPressed: _isBusy ? null : _onConfirmImport,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.primary,
-                    foregroundColor: theme.colorScheme.onPrimary,
-                    minimumSize: const Size(double.infinity, 50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                  Card(
+                    child: ListTile(
+                      title: const Text('Source File'),
+                      subtitle: Text(
+                        _selectedFilePath?.split('/').last ?? 'Not selected',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      leading: const Icon(Icons.file_open_outlined),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: _pickFile,
                     ),
                   ),
-                  child: Text(
+                  const SizedBox(height: 24),
+                ],
+
+                // ── Action ────────────────────────────────────────────────
+                FilledButton.icon(
+                  onPressed: _isBusy ? null : _onConfirmImport,
+                  icon: Icon(
+                    widget.type == ContentType.movie
+                        ? Icons.download_outlined
+                        : Icons.list_alt,
+                  ),
+                  label: Text(
                     widget.type == ContentType.movie
                         ? 'Import Movie'
                         : 'Select Episodes',
+                  ),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 52),
                   ),
                 ),
               ],
             ),
           ),
           if (_isBusy)
-            const BusyOverlay(message: 'Accessing storage...', showBlur: false),
+            const BusyOverlay(message: 'Accessing storage…', showBlur: false),
         ],
       ),
     );

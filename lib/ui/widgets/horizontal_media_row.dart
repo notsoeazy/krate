@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:krate/data/models/content.dart';
 import 'package:krate/ui/widgets/media_card.dart';
 
+/// A horizontal scrolling row of [MediaCard]s with a titled header and
+/// a "See all" action button.
 class HorizontalMediaRow extends StatelessWidget {
   final String title;
   final List<Content> items;
@@ -26,38 +28,25 @@ class HorizontalMediaRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(title, style: theme.textTheme.titleMedium),
-              InkWell(
-                onTap: onSeeAll,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 2,
-                  ),
-                  child: Text(
-                    'See all →',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
+              // TextButton is the correct M3 low-emphasis action ─ replaces
+              // the old InkWell-wrapped Text.
+              TextButton(onPressed: onSeeAll, child: const Text('See all')),
             ],
           ),
         ),
         SizedBox(
-          height: 250,
+          height: 240,
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             scrollDirection: Axis.horizontal,
             itemCount: items.length,
-            separatorBuilder: (context, index) => const SizedBox(width: 12),
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
             itemBuilder: (context, index) {
               return MediaCard(
                 content: items[index],

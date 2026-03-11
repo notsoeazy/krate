@@ -1,21 +1,10 @@
-/// Tracks the current resume point for a single episode/movie.
-///
-/// There is at most one row per [episodeId] — movies and episodes are
-/// treated symmetrically (movies have a single episode row).
 class WatchProgress {
   final int? id;
   final int contentId;
   final int episodeId;
-
-  /// Last playback position in milliseconds.
   final int positionMs;
-
-  /// Duration of the video in milliseconds (cached to compute percentage).
   final int durationMs;
-
-  /// True once the user has passed [kFinishedThreshold].
   final bool isFinished;
-
   final DateTime lastWatchedAt;
 
   const WatchProgress({

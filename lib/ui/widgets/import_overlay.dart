@@ -6,6 +6,10 @@ import 'package:krate/data/models/import_job.dart';
 import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/screens/import/search_import_screen.dart';
 
+/// Root overlay widget that wraps the main shell body.
+///
+/// Shows a [FloatingActionButton] to start an import, a notification chip
+/// while jobs are running, and an expandable job-status card.
 class ImportOverlay extends ConsumerStatefulWidget {
   final Widget child;
 
@@ -18,12 +22,6 @@ class ImportOverlay extends ConsumerStatefulWidget {
 class _ImportOverlayState extends ConsumerState<ImportOverlay> {
   bool _isExpanded = false;
 
-  void setExpanded(bool value) {
-    setState(() {
-      _isExpanded = value;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final jobs = ref.watch(importJobsProvider);
@@ -32,22 +30,25 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
 
     return Stack(
       children: [
-        // The main app content
         widget.child,
 
-        // Dimmer background when expanded
+        // Scrim when panel is expanded
         if (_isExpanded)
           Positioned.fill(
             child: GestureDetector(
               onTap: () => setState(() => _isExpanded = false),
-              child: Container(color: Colors.black54),
+              child: ColoredBox(
+                color: Theme.of(
+                  context,
+                ).colorScheme.scrim.withValues(alpha: 0.54),
+              ),
             ),
           ),
 
-        // Toast at the top
+        // Toast notification at the top
         ImportToast(onExpand: () => setState(() => _isExpanded = true)),
 
-        // Floating UI at the bottom
+        // FAB + job panel at the bottom-right
         Positioned(
           bottom: 16,
           right: 16,
@@ -56,12 +57,8 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Job List Panel (visible when expanded)
               if (_isExpanded) _buildJobPanel(context, jobs),
-
               const SizedBox(height: 12),
-
-              // FAB / Progress Toggle
               _buildFAB(context, activeCount, hasJobs),
             ],
           ),
@@ -70,135 +67,94 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
     );
   }
 
+  // ── FAB ────────────────────────────────────────────────────────────────
+
   Widget _buildFAB(BuildContext context, int activeCount, bool hasJobs) {
-    final theme = Theme.of(context);
+    if (_isExpanded) return const SizedBox.shrink();
 
-    if (activeCount > 0 && !_isExpanded) {
-      return GestureDetector(
-        onTap: () => setState(() => _isExpanded = true),
-        child: Container(
-          height: 56,
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.primary,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.3),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  valueColor: AlwaysStoppedAnimation(
-                    theme.colorScheme.onPrimary,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                '$activeCount importing...',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: theme.colorScheme.onPrimary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    if (!_isExpanded) {
+    // Active import in progress — show a FAB.extended with a spinner
+    if (activeCount > 0) {
       return FloatingActionButton.extended(
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (context) => const SearchImportScreen()),
+        onPressed: () => setState(() => _isExpanded = true),
+        icon: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.5,
+            color: Theme.of(context).colorScheme.onPrimaryContainer,
+          ),
         ),
-        icon: const Icon(Icons.add),
-        label: const Text('Import'),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
+        label: Text('$activeCount importing…'),
       );
     }
 
-    return const SizedBox.shrink();
+    // Default: open import search
+    return FloatingActionButton.extended(
+      onPressed: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (context) => const SearchImportScreen()),
+      ),
+      icon: const Icon(Icons.add),
+      label: const Text('Import'),
+    );
   }
+
+  // ── Job Panel (M3 Card) ────────────────────────────────────────────────
 
   Widget _buildJobPanel(BuildContext context, List<ImportJob> jobs) {
     final theme = Theme.of(context);
 
-    return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.4,
-      ),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Imports', style: theme.textTheme.titleMedium),
-                IconButton(
-                  icon: const Icon(Icons.close, size: 20),
-                  onPressed: () => setState(() => _isExpanded = false),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          Flexible(
-            child: ListView.separated(
-              shrinkWrap: true,
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: jobs.length,
-              separatorBuilder: (context, index) =>
-                  const Divider(height: 1, indent: 16),
-              itemBuilder: (context, index) {
-                final job = jobs[index];
-                return _buildJobTile(context, job);
-              },
-            ),
-          ),
-          if (jobs.any((j) => !j.isActive))
+    return Card(
+      elevation: 3,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.4,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: TextButton(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Imports', style: theme.textTheme.titleMedium),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => setState(() => _isExpanded = false),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+
+            // Job list
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                itemCount: jobs.length,
+                separatorBuilder: (_, _) =>
+                    const Divider(height: 1, indent: 16, endIndent: 16),
+                itemBuilder: (context, index) =>
+                    _buildJobTile(context, jobs[index], theme),
+              ),
+            ),
+
+            // Clear finished button
+            if (jobs.any((j) => !j.isActive))
+              TextButton(
                 onPressed: () =>
                     ref.read(importJobsProvider.notifier).dismissCompleted(),
                 child: const Text('Clear finished'),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildJobTile(BuildContext context, ImportJob job) {
-    final theme = Theme.of(context);
-
+  Widget _buildJobTile(BuildContext context, ImportJob job, ThemeData theme) {
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -222,7 +178,7 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              _buildStatusIcon(job, theme),
+              _StatusIcon(job: job),
             ],
           ),
           const SizedBox(height: 4),
@@ -230,7 +186,7 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
           if (job.isActive) ...[
             const SizedBox(height: 8),
             LinearProgressIndicator(
-              value: job.progress,
+              value: null,
               minHeight: 4,
               borderRadius: BorderRadius.circular(2),
             ),
@@ -248,18 +204,11 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
       ),
     );
   }
-
-  Widget _buildStatusIcon(ImportJob job, ThemeData theme) {
-    if (job.status == ImportJobStatus.done) {
-      return const Icon(Icons.check_circle, color: Colors.green, size: 16);
-    }
-    if (job.status == ImportJobStatus.error) {
-      return Icon(Icons.error, color: theme.colorScheme.error, size: 16);
-    }
-    return const SizedBox.shrink();
-  }
 }
 
+// ── Import Toast ─────────────────────────────────────────────────────────────
+
+/// Top-of-screen notification chip shown when a job completes or fails.
 class ImportToast extends ConsumerStatefulWidget {
   final VoidCallback onExpand;
 
@@ -281,9 +230,7 @@ class _ImportToastState extends ConsumerState<ImportToast> {
   void _startTimer() {
     _dismissTimer?.cancel();
     _dismissTimer = Timer(const Duration(seconds: 5), () {
-      if (mounted) {
-        ref.read(importToastProvider.notifier).dismiss();
-      }
+      if (mounted) ref.read(importToastProvider.notifier).dismiss();
     });
   }
 
@@ -303,68 +250,60 @@ class _ImportToastState extends ConsumerState<ImportToast> {
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOutBack,
           tween: Tween(begin: -100.0, end: 0.0),
-          builder: (context, offset, child) {
-            return Transform.translate(offset: Offset(0, offset), child: child);
-          },
+          builder: (context, offset, child) =>
+              Transform.translate(offset: Offset(0, offset), child: child),
           child: GestureDetector(
             onTap: () {
               ref.read(importToastProvider.notifier).dismiss();
               widget.onExpand();
             },
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  _StatusIcon(job: job),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          job.title,
-                          style: theme.textTheme.titleSmall,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          job.status == ImportJobStatus.done
-                              ? 'Import complete'
-                              : job.status == ImportJobStatus.error
-                              ? 'Import failed'
-                              : job.currentStep ?? 'Importing...',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: job.status == ImportJobStatus.error
-                                ? theme.colorScheme.error
-                                : theme.colorScheme.onSurfaceVariant,
+            // Use M3 Card for the toast surface
+            child: Card(
+              margin: EdgeInsets.zero,
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    _StatusIcon(job: job),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            job.title,
+                            style: theme.textTheme.titleSmall,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
+                          Text(
+                            job.status == ImportJobStatus.done
+                                ? 'Import complete'
+                                : job.status == ImportJobStatus.error
+                                ? 'Import failed'
+                                : job.currentStep ?? 'Importing…',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: job.status == ImportJobStatus.error
+                                  ? theme.colorScheme.error
+                                  : theme.colorScheme.onSurfaceVariant,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, size: 20),
-                    onPressed: () {
-                      ref.read(importToastProvider.notifier).dismiss();
-                    },
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () =>
+                          ref.read(importToastProvider.notifier).dismiss(),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -373,6 +312,8 @@ class _ImportToastState extends ConsumerState<ImportToast> {
     );
   }
 }
+
+// ── Status Icon ───────────────────────────────────────────────────────────────
 
 class _StatusIcon extends StatelessWidget {
   final ImportJob job;
@@ -384,30 +325,33 @@ class _StatusIcon extends StatelessWidget {
     final theme = Theme.of(context);
 
     if (job.status == ImportJobStatus.done) {
-      return Container(
-        padding: const EdgeInsets.all(4),
-        decoration: const BoxDecoration(
-          color: Colors.green,
-          shape: BoxShape.circle,
+      // CircleAvatar uses surface colour roles — no hardcoded green
+      return CircleAvatar(
+        radius: 12,
+        backgroundColor: theme.colorScheme.tertiaryContainer,
+        child: Icon(
+          Icons.check,
+          color: theme.colorScheme.onTertiaryContainer,
+          size: 14,
         ),
-        child: const Icon(Icons.check, color: Colors.white, size: 16),
       );
     }
 
     if (job.status == ImportJobStatus.error) {
-      return Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.error,
-          shape: BoxShape.circle,
+      return CircleAvatar(
+        radius: 12,
+        backgroundColor: theme.colorScheme.errorContainer,
+        child: Icon(
+          Icons.priority_high,
+          color: theme.colorScheme.onErrorContainer,
+          size: 14,
         ),
-        child: const Icon(Icons.priority_high, color: Colors.white, size: 16),
       );
     }
 
     return SizedBox(
-      width: 20,
-      height: 20,
+      width: 24,
+      height: 24,
       child: CircularProgressIndicator(
         strokeWidth: 2,
         value: job.progress > 0 ? job.progress : null,

@@ -1,9 +1,5 @@
 import 'package:krate/utils/constants.dart';
 
-/// Represents a single playable episode within a [Content] item.
-///
-/// Movies have exactly **one** Episode row (seasonNumber/episodeNumber = null).
-/// Series have one row per episode.
 class Episode {
   final int? id;
   final int contentId;
@@ -14,16 +10,9 @@ class Episode {
   final String? description;
   final int? runtime; // minutes
   final DateTime? airDate;
-
-  /// Absolute local path to the video file on disk.
   final String? videoPath;
-
-  /// Absolute local path to an external subtitle file (.srt / .ass).
   final String? subtitlePath;
-
-  /// Subtitle delay offset in milliseconds (positive = delay, negative = advance).
   final int subtitleDelayMs;
-
   final FileStatus fileStatus;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -46,11 +35,7 @@ class Episode {
     required this.updatedAt,
   });
 
-  // ---------------------------------------------------------------------------
   // Factory constructors
-  // ---------------------------------------------------------------------------
-
-  /// Creates a placeholder Episode for a movie (no season/episode numbers).
   factory Episode.forMovie({
     required int contentId,
     String? videoPath,
@@ -67,7 +52,6 @@ class Episode {
     );
   }
 
-  /// Creates an Episode from a raw TMDB season episode map.
   factory Episode.fromTmdbEpisode(Map<String, dynamic> data, int contentId) {
     final now = DateTime.now();
     return Episode(
@@ -86,10 +70,7 @@ class Episode {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // DB serialisation
-  // ---------------------------------------------------------------------------
-
+  // DB serialization
   Map<String, dynamic> toMap() => {
     'contentId': contentId,
     'seasonNumber': seasonNumber,
@@ -130,18 +111,11 @@ class Episode {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // Helpers
-  // ---------------------------------------------------------------------------
 
   bool get isMovie => seasonNumber == null;
   bool get hasFile => fileStatus == FileStatus.ready;
 
-  /// Returns a copy of this Episode with the given fields replaced.
-  ///
-  /// To explicitly clear a nullable String field (e.g. after deleting a file),
-  /// pass the corresponding `clear*` flag as `true`. The `??` pattern on
-  /// nullable params means passing `null` is a no-op without these flags.
   Episode copyWith({
     int? id,
     int? contentId,

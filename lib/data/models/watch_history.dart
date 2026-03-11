@@ -1,15 +1,9 @@
-/// Records a single completed viewing session.
-///
-/// Written when the user finishes watching (or stops after meaningful progress).
-/// Powers the "History" tab in Recents.
 class WatchHistory {
   final int? id;
   final int contentId;
   final int episodeId;
   final DateTime startedAt;
   final DateTime finishedAt;
-
-  /// How many milliseconds the user actually watched in this session.
   final int durationWatchedMs;
 
   const WatchHistory({

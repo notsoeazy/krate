@@ -32,3 +32,10 @@ const kMetadataSchemaVersion = 2;
 
 // Playback
 const kFinishedThreshold = 0.92;
+
+// Typography — Google Fonts family names
+/// Font used for body text, labels, and captions.
+const kBodyFont = 'Inter';
+
+/// Font used for display text, headings, and titles.
+const kDisplayFont = 'Inter';

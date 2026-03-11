@@ -1,11 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 
-/// Singleton sqflite database manager for Krate.
-///
-/// The SQLite database is stored in the OS-managed app data directory
-/// (returned by [getDatabasesPath]). It acts purely as a **cache** —
-/// the self-scribed `.metadata.json` files are the source of truth.
 class AppDatabase {
   AppDatabase._internal();
   static final AppDatabase instance = AppDatabase._internal();
@@ -32,9 +27,7 @@ class AppDatabase {
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    // -------------------------------------------------------------------------
-    // content
-    // -------------------------------------------------------------------------
+    // Content table stores movie and series metadata
     await db.execute('''
       CREATE TABLE content (
         id                INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,9 +58,7 @@ class AppDatabase {
       )
     ''');
 
-    // -------------------------------------------------------------------------
-    // episodes
-    // -------------------------------------------------------------------------
+    // Episodes table stores individual movie/series episode details
     await db.execute('''
       CREATE TABLE episodes (
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -89,9 +80,7 @@ class AppDatabase {
       )
     ''');
 
-    // -------------------------------------------------------------------------
-    // watch_progress  (one row per episode; upserted on every player save)
-    // -------------------------------------------------------------------------
+    // Watch progress tracked per episode
     await db.execute('''
       CREATE TABLE watch_progress (
         id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -106,9 +95,7 @@ class AppDatabase {
       )
     ''');
 
-    // -------------------------------------------------------------------------
-    // watch_history  (append-only log; one row per viewing session)
-    // -------------------------------------------------------------------------
+    // Watch history for viewing sessions
     await db.execute('''
       CREATE TABLE watch_history (
         id                INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -122,9 +109,7 @@ class AppDatabase {
       )
     ''');
 
-    // -------------------------------------------------------------------------
     // Indexes for common query patterns
-    // -------------------------------------------------------------------------
     await db.execute('CREATE INDEX idx_content_type ON content(contentType)');
     await db.execute(
       'CREATE INDEX idx_episodes_content ON episodes(contentId)',

@@ -1,8 +1,5 @@
 import 'package:krate/utils/constants.dart';
 
-/// Represents a single in-flight or recently completed import operation.
-///
-/// Managed by [ImportJobsNotifier] in the providers layer.
 class ImportJob {
   final String id; // UUID
   final String title;

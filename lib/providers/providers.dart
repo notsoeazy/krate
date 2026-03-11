@@ -18,27 +18,18 @@ import 'package:krate/services/storage_service.dart';
 import 'package:krate/services/tmdb_service.dart';
 import 'package:krate/services/watch_progress_service.dart';
 
-// ---------------------------------------------------------------------------
 // UI State Providers
-// ---------------------------------------------------------------------------
-
 final shellTabIndexProvider = StateProvider<int>((ref) => 0);
 
 /// Which tab the Library screen should show: 0 = Movies, 1 = Series.
 final libraryTabProvider = StateProvider<int>((ref) => 0);
 
-// ---------------------------------------------------------------------------
-// Infrastructure — singletons
-// ---------------------------------------------------------------------------
-
+// Infrastructure singletons
 final storageServiceProvider = Provider<StorageService>(
   (ref) => StorageService(),
 );
 
-// ---------------------------------------------------------------------------
 // Repositories
-// ---------------------------------------------------------------------------
-
 final contentRepoProvider = Provider<ContentRepository>(
   (ref) => ContentRepository(),
 );
@@ -55,10 +46,7 @@ final watchHistoryRepoProvider = Provider<WatchHistoryRepository>(
   (ref) => WatchHistoryRepository(),
 );
 
-// ---------------------------------------------------------------------------
 // Services
-// ---------------------------------------------------------------------------
-
 final tmdbServiceProvider = Provider<TMDBService>((ref) => TMDBService());
 
 final artworkServiceProvider = Provider<ArtworkService>(
@@ -97,18 +85,12 @@ final watchProgressServiceProvider = Provider<WatchProgressService>((ref) {
   );
 });
 
-// ---------------------------------------------------------------------------
 // Vault status (checked on startup)
-// ---------------------------------------------------------------------------
-
 final vaultStatusProvider = FutureProvider<VaultStatus>((ref) {
   return ref.read(storageServiceProvider).checkIntegrity();
 });
 
-// ---------------------------------------------------------------------------
-// Import Jobs — globally managed list of in-flight/recent imports
-// ---------------------------------------------------------------------------
-
+// Import Jobs globally managed list of in-flight/recent imports
 class ImportJobsNotifier extends StateNotifier<List<ImportJob>> {
   final Ref _ref;
   ImportJobsNotifier(this._ref) : super([]);
@@ -191,6 +173,14 @@ class ImportJobsNotifier extends StateNotifier<List<ImportJob>> {
     if (content.id != null) _invalidateContentData(content.id!);
   }
 
+  Future<void> rescanMovie({
+    required ImportService service,
+    required Content content,
+  }) async {
+    await service.rescanMovie(content: content, onUpdate: _update);
+    if (content.id != null) _invalidateContentData(content.id!);
+  }
+
   Future<void> rescanSeries({
     required ImportService service,
     required Content content,
@@ -221,10 +211,7 @@ final importJobsProvider =
       (ref) => ImportJobsNotifier(ref),
     );
 
-// ---------------------------------------------------------------------------
-// Import Toast — manages a single temporary toast for job completion/error
-// ---------------------------------------------------------------------------
-
+// Import Toast manages a single temporary toast for job completion/error
 class ImportToastNotifier extends StateNotifier<ImportJob?> {
   ImportToastNotifier() : super(null);
 
@@ -242,10 +229,7 @@ final importToastProvider =
       (ref) => ImportToastNotifier(),
     );
 
-// ---------------------------------------------------------------------------
 // Scanner state
-// ---------------------------------------------------------------------------
-
 class ScannerNotifier
     extends StateNotifier<({bool isScanning, double progress, String status})> {
   final ScannerService _scanner;
@@ -279,10 +263,7 @@ final scannerProvider =
       ({bool isScanning, double progress, String status})
     >((ref) => ScannerNotifier(ref.read(scannerServiceProvider), ref));
 
-// ---------------------------------------------------------------------------
 // Library data providers (async, cached per filter)
-// ---------------------------------------------------------------------------
-
 final moviesProvider = FutureProvider.autoDispose<List<Content>>((ref) {
   return ref.read(contentRepoProvider).getAll(type: ContentType.movie);
 });
@@ -353,10 +334,19 @@ final watchProgressProvider = FutureProvider.family
       return ref.read(watchProgressRepoProvider).getByEpisodeId(episodeId);
     });
 
-// ---------------------------------------------------------------------------
-// Media Management — per-screen scoped state
-// ---------------------------------------------------------------------------
+/// Returns episode count info for a series used to render the progress badge
+/// on [MediaCard]. Derived from [contentEpisodesProvider].
+/// Record: {total: int, available: int}.
+final contentEpisodeCountProvider =
+    FutureProvider.family<({int total, int available}), int>((
+      ref,
+      contentId,
+    ) async {
+      final eps = await ref.watch(contentEpisodesProvider(contentId).future);
+      return (total: eps.length, available: eps.where((e) => e.hasFile).length);
+    });
 
+// Media Management per-screen scoped state
 /// The exclusive interaction mode of [MediaManagementScreen].
 enum ManagementMode {
   /// Default — tap an episode icon to stage a file for import.
@@ -406,8 +396,7 @@ class MediaManagementState {
     this.isPickerOpen = false,
   });
 
-  // ── Derived guards used by the UI ─────────────────────────────────────────
-
+  // Derived guards used by the UI
   bool get hasJobRunning => mode == ManagementMode.jobRunning;
   bool get isDeleteMode => mode == ManagementMode.deleteSelection;
 
@@ -439,8 +428,7 @@ class MediaManagementState {
 class MediaManagementNotifier extends StateNotifier<MediaManagementState> {
   MediaManagementNotifier() : super(const MediaManagementState());
 
-  // ── File picker ───────────────────────────────────────────────────────────
-
+  // File picker
   Future<void> pickFile({
     required int episodeId,
     required bool episodeHasFile,
@@ -476,8 +464,7 @@ class MediaManagementNotifier extends StateNotifier<MediaManagementState> {
     state = state.copyWith(stagedFiles: updated);
   }
 
-  // ── Delete mode ───────────────────────────────────────────────────────────
-
+  // Delete mode
   void enterDeleteMode() {
     if (!state.canSwitchToDelete) return;
     state = state.copyWith(
@@ -502,8 +489,7 @@ class MediaManagementNotifier extends StateNotifier<MediaManagementState> {
     state = state.copyWith(deleteSelections: updated);
   }
 
-  // ── Job lifecycle ─────────────────────────────────────────────────────────
-
+  // Job lifecycle
   void markJobRunning() {
     state = state.copyWith(mode: ManagementMode.jobRunning);
   }

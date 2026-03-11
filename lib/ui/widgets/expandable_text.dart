@@ -56,7 +56,6 @@ class _ExpandableTextState extends State<ExpandableText> {
                         _isExpanded ? 'Show less' : 'Show more',
                         style: theme.textTheme.labelLarge?.copyWith(
                           color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),

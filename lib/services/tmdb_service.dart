@@ -4,17 +4,12 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:krate/utils/errors.dart';
 
-/// Thin wrapper around the TMDB v3 REST API.
 class TMDBService {
   static const _base = 'https://api.themoviedb.org/3';
 
   String get _apiKey => dotenv.env['TMDB_API_KEY'] ?? '';
 
-  // ---------------------------------------------------------------------------
   // Search
-  // ---------------------------------------------------------------------------
-
-  /// Multi-search returns both movies and TV series in one call.
   Future<List<Map<String, dynamic>>> searchMulti(String query) async {
     final results = await _getList(
       '$_base/search/multi?api_key=$_apiKey&query=${Uri.encodeComponent(query)}',
@@ -33,10 +28,7 @@ class TMDBService {
     '$_base/search/tv?api_key=$_apiKey&query=${Uri.encodeComponent(query)}',
   );
 
-  // ---------------------------------------------------------------------------
   // Details
-  // ---------------------------------------------------------------------------
-
   Future<Map<String, dynamic>> getMovieDetails(int tmdbId) =>
       _get('$_base/movie/$tmdbId?api_key=$_apiKey&append_to_response=credits');
 
@@ -46,20 +38,14 @@ class TMDBService {
   Future<Map<String, dynamic>> getSeasonDetails(int tmdbId, int seasonNumber) =>
       _get('$_base/tv/$tmdbId/season/$seasonNumber?api_key=$_apiKey');
 
-  // ---------------------------------------------------------------------------
   // Image URL helpers
-  // ---------------------------------------------------------------------------
-
   static String posterUrl(String tmdbPath, {String size = 'w500'}) =>
       'https://image.tmdb.org/t/p/$size$tmdbPath';
 
   static String backdropUrl(String tmdbPath, {String size = 'w780'}) =>
       'https://image.tmdb.org/t/p/$size$tmdbPath';
 
-  // ---------------------------------------------------------------------------
   // Private HTTP helpers
-  // ---------------------------------------------------------------------------
-
   Future<Map<String, dynamic>> _get(String url) async {
     try {
       final response = await http.get(Uri.parse(url));

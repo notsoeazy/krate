@@ -22,8 +22,9 @@ class HomeScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
+            tooltip: 'Search library',
             onPressed: () {
-              ref.read(shellTabIndexProvider.notifier).state = 1; // Library
+              ref.read(shellTabIndexProvider.notifier).state = 1;
             },
           ),
         ],
@@ -52,6 +53,7 @@ class HomeScreen extends ConsumerWidget {
     AsyncValue<List<Content>> recentMovies,
     AsyncValue<List<Content>> recentSeries,
   ) {
+    final theme = Theme.of(context);
     final hasData =
         (continueWatching.valueOrNull?.isNotEmpty ?? false) ||
         (recentMovies.valueOrNull?.isNotEmpty ?? false) ||
@@ -70,24 +72,21 @@ class HomeScreen extends ConsumerWidget {
             Icon(
               Icons.movie_filter_outlined,
               size: 80,
-              color: Theme.of(context).colorScheme.outlineVariant,
+              color: theme.colorScheme.outlineVariant,
             ),
             const SizedBox(height: 16),
-            Text(
-              'Your library is empty',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
+            Text('Your library is empty', style: theme.textTheme.headlineSmall),
             const SizedBox(height: 8),
             Text(
-              'Import your favorite movies or series',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.outline,
+              'Import your favourite movies or series',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.outline,
               ),
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: () {
-                ref.read(shellTabIndexProvider.notifier).state = 1; // Library
+                ref.read(shellTabIndexProvider.notifier).state = 1;
               },
               icon: const Icon(Icons.add),
               label: const Text('Go to Library'),
@@ -104,7 +103,7 @@ class HomeScreen extends ConsumerWidget {
           data: (items) => _ContinueWatchingRow(
             items: items,
             onSeeAll: () {
-              ref.read(shellTabIndexProvider.notifier).state = 2; // Recents
+              ref.read(shellTabIndexProvider.notifier).state = 2;
             },
           ),
           loading: () => const SizedBox(
@@ -114,14 +113,14 @@ class HomeScreen extends ConsumerWidget {
           error: (e, _) => const SizedBox.shrink(),
         ),
 
-        // Movies
+        // Recent Movies
         recentMovies.when(
           data: (items) => HorizontalMediaRow(
             title: 'Movies',
             items: items,
             onSeeAll: () {
-              ref.read(libraryTabProvider.notifier).state = 0; // Movies tab
-              ref.read(shellTabIndexProvider.notifier).state = 1; // Library
+              ref.read(libraryTabProvider.notifier).state = 0;
+              ref.read(shellTabIndexProvider.notifier).state = 1;
             },
             onItemSelected: (item) => Navigator.of(context).push(
               MaterialPageRoute(
@@ -133,14 +132,14 @@ class HomeScreen extends ConsumerWidget {
           error: (e, _) => const SizedBox.shrink(),
         ),
 
-        // Series
+        // Recent Series
         recentSeries.when(
           data: (items) => HorizontalMediaRow(
             title: 'Series',
             items: items,
             onSeeAll: () {
-              ref.read(libraryTabProvider.notifier).state = 1; // Series tab
-              ref.read(shellTabIndexProvider.notifier).state = 1; // Library
+              ref.read(libraryTabProvider.notifier).state = 1;
+              ref.read(shellTabIndexProvider.notifier).state = 1;
             },
             onItemSelected: (item) => Navigator.of(context).push(
               MaterialPageRoute(
@@ -158,12 +157,8 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Continue Watching row — custom implementation so each card can resolve its
-// own resume episode before launching the player.
-// ---------------------------------------------------------------------------
+// ── Continue Watching row ─────────────────────────────────────────────────────
 
-/// Renders the "Continue Watching" horizontal row.
 class _ContinueWatchingRow extends StatelessWidget {
   final List<Content> items;
   final VoidCallback onSeeAll;
@@ -180,33 +175,19 @@ class _ContinueWatchingRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text('Continue Watching', style: theme.textTheme.titleMedium),
-              InkWell(
-                onTap: onSeeAll,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 2,
-                  ),
-                  child: Text(
-                    'See all →',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
+              // TextButton — correct M3 low-emphasis action
+              TextButton(onPressed: onSeeAll, child: const Text('See all')),
             ],
           ),
         ),
         SizedBox(
-          height: 250,
+          height: 240,
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             scrollDirection: Axis.horizontal,
@@ -221,85 +202,87 @@ class _ContinueWatchingRow extends StatelessWidget {
   }
 }
 
-/// A single Continue Watching card.
-///
-/// Resolves [resumeEpisodeProvider] per-content so the tap always opens the
-/// correct episode — identical logic to the Play button in [MediaDetailsScreen].
+// ── Single Continue Watching card ─────────────────────────────────────────────
+
 class _ContinueWatchingItemCard extends ConsumerWidget {
   final Content content;
   const _ContinueWatchingItemCard({required this.content});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final resumeEpisodeAsync = ref.watch(resumeEpisodeProvider(content.id!));
     final isLoading = resumeEpisodeAsync.isLoading;
 
-    return GestureDetector(
-      onTap: () {
-        resumeEpisodeAsync.whenData((episode) {
-          if (episode == null || !episode.hasFile) {
-            // No playable episode — open the details screen instead.
+    return SizedBox(
+      width: 120,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          resumeEpisodeAsync.whenData((episode) {
+            if (episode == null || !episode.hasFile) {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => MediaDetailsScreen(contentId: content.id!),
+                ),
+              );
+              return;
+            }
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => MediaDetailsScreen(contentId: content.id!),
+                builder: (_) => PlayerScreen(episodeId: episode.id!),
               ),
             );
-            return;
-          }
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => PlayerScreen(episodeId: episode.id!),
-            ),
-          );
-        });
-      },
-      child: Stack(
-        children: [
-          // Shared MediaCard for poster / title / progress bar rendering.
-          MediaCard(content: content, onTap: () {}, width: 120),
+          });
+        },
+        child: Stack(
+          children: [
+            // Poster card
+            MediaCard(content: content, onTap: () {}, width: 120),
 
-          // Spinner while the resume episode is resolving.
-          if (isLoading)
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.black38,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Center(
-                  child: SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-              ),
-            ),
-
-          // Play icon overlay when ready.
-          if (!isLoading)
-            Positioned(
-              bottom: 36,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.all(6),
+            // Loading overlay — colorScheme.scrim instead of Colors.black38
+            if (isLoading)
+              Positioned.fill(
+                child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.85),
-                    shape: BoxShape.circle,
+                    color: theme.colorScheme.scrim.withValues(alpha: 0.38),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    Icons.play_arrow,
-                    color: Theme.of(context).colorScheme.onPrimary,
-                    size: 20,
+                  child: const Center(
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
                   ),
                 ),
               ),
-            ),
-        ],
+
+            // Play icon overlay
+            if (!isLoading)
+              Positioned(
+                bottom: 36,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.85),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: Icon(
+                        Icons.play_arrow_rounded,
+                        color: theme.colorScheme.onPrimary,
+                        size: 22,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

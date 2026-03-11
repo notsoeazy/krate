@@ -22,12 +22,9 @@ class _StorageSetupScreenState extends ConsumerState<StorageSetupScreen> {
     });
 
     try {
-      // Request permission on Android first
       if (Theme.of(context).platform == TargetPlatform.android) {
         PermissionStatus status = await Permission.storage.request();
 
-        // On Android 11+ (API 30+), Scoped Storage requires MANAGE_EXTERNAL_STORAGE
-        // for full access to non-media folders or broad management.
         if (!status.isGranted) {
           status = await Permission.manageExternalStorage.request();
         }
@@ -67,7 +64,6 @@ class _StorageSetupScreenState extends ConsumerState<StorageSetupScreen> {
       }
 
       await ref.read(storageServiceProvider).setRoot(path);
-      // Invalidate the vault status to trigger a re-check
       ref.invalidate(vaultStatusProvider);
     } catch (e) {
       if (mounted) {
@@ -84,70 +80,64 @@ class _StorageSetupScreenState extends ConsumerState<StorageSetupScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Logo placeholder
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.folder_zip_outlined,
-                  size: 60,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-              const SizedBox(height: 32),
-              Text(
-                'Welcome to Krate',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Krate needs a storage directory to save your media metadata and artwork. Select a folder to begin.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 48),
-              if (_isLoading)
-                const CircularProgressIndicator()
-              else
-                ElevatedButton.icon(
-                  onPressed: _pickDirectory,
-                  icon: const Icon(Icons.folder_open),
-                  label: const Text('Choose Storage Location'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.primary,
-                    foregroundColor: theme.colorScheme.onPrimary,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 16,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Icon in a surface container circle
+                CircleAvatar(
+                  radius: 52,
+                  backgroundColor: theme.colorScheme.primaryContainer,
+                  child: Icon(
+                    Icons.folder_zip_outlined,
+                    size: 52,
+                    color: theme.colorScheme.onPrimaryContainer,
                   ),
                 ),
-              if (_error != null) ...[
+                const SizedBox(height: 32),
+                Text(
+                  'Welcome to Krate',
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 16),
                 Text(
-                  _error!,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.error,
-                  ),
+                  'Krate needs a storage directory to save your media metadata '
+                  'and artwork. Select a folder to begin.',
                   textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
+                const SizedBox(height: 48),
+                if (_isLoading)
+                  const CircularProgressIndicator()
+                else
+                  // FilledButton is the M3 primary action button
+                  FilledButton.icon(
+                    onPressed: _pickDirectory,
+                    icon: const Icon(Icons.folder_open_outlined),
+                    label: const Text('Choose Storage Location'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 52),
+                    ),
+                  ),
+                if (_error != null) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    _error!,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

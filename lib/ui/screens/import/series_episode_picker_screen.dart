@@ -18,7 +18,7 @@ class SeriesEpisodePickerScreen extends ConsumerStatefulWidget {
 
 class _SeriesEpisodePickerScreenState
     extends ConsumerState<SeriesEpisodePickerScreen> {
-  final Map<String, String> _selectedFiles = {}; // "S{season}E{ep}" -> filePath
+  final Map<String, String> _selectedFiles = {};
   bool _isLoadingTmdb = true;
   bool _isPickingFile = false;
   Content? _content;
@@ -42,7 +42,6 @@ class _SeriesEpisodePickerScreenState
         _content = Content.fromTmdbSeries(data);
       }
 
-      // Load episodes from TMDB to ensure we have the full list even if not in DB
       _tmdbEpisodes = [];
       for (int s = 1; s <= _content!.totalSeasons; s++) {
         final seasonData = await tmdb.getSeasonDetails(widget.tmdbId, s);
@@ -62,7 +61,6 @@ class _SeriesEpisodePickerScreenState
     if (_content == null) return;
     setState(() => _isLoadingTmdb = true);
     try {
-      // We can use a simplified version of importSeries logic to just fetch/refresh metadata
       final tmdb = ref.read(tmdbServiceProvider);
       final data = await tmdb.getSeriesDetails(widget.tmdbId);
       final updatedContent = Content.fromTmdbSeries(
@@ -120,9 +118,9 @@ class _SeriesEpisodePickerScreenState
         allowedExtensions: ['mp4', 'mkv', 'avi', 'mov', 'wmv'],
       );
       if (result != null && result.files.single.path != null) {
-        setState(() {
-          _selectedFiles['S${season}E$epNum'] = result.files.single.path!;
-        });
+        setState(
+          () => _selectedFiles['S${season}E$epNum'] = result.files.single.path!,
+        );
       }
     } finally {
       if (mounted) setState(() => _isPickingFile = false);
@@ -132,7 +130,6 @@ class _SeriesEpisodePickerScreenState
   void _onImport() {
     if (_content == null || _selectedFiles.isEmpty) return;
 
-    // Convert flat map to season-based map for ImportService
     final Map<int, Map<int, String>> mappedFiles = {};
     for (final entry in _selectedFiles.entries) {
       final match = RegExp(r'S(\d+)E(\d+)').firstMatch(entry.key);
@@ -151,7 +148,6 @@ class _SeriesEpisodePickerScreenState
           episodeFiles: mappedFiles,
         );
 
-    // Pop back to root (Home) as requested
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
@@ -165,7 +161,6 @@ class _SeriesEpisodePickerScreenState
       return const Scaffold(body: Center(child: Text('Failed to load series')));
     }
 
-    // Group TMDB episodes by season
     final seasons = <int, List<Map<String, dynamic>>>{};
     for (final ep in _tmdbEpisodes) {
       final s = ep['season_number'] as int? ?? 0;
@@ -197,68 +192,61 @@ class _SeriesEpisodePickerScreenState
                   ),
                 );
 
-              return Theme(
-                data: Theme.of(
-                  context,
-                ).copyWith(dividerColor: Colors.transparent),
-                child: ExpansionTile(
-                  title: Text(
-                    'Season $seasonNum',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  initiallyExpanded: index == 0,
-                  children: seasonEpisodes.map((epData) {
-                    final epNum = epData['episode_number'] as int? ?? 0;
-                    final key = 'S${seasonNum}E$epNum';
-                    final filePath = _selectedFiles[key];
-
-                    // Try to find if this episode is already in library (if content.id exists)
-                    // This is optional but nice. For now we just show it as a picker.
-                    return ManagedEpisodeTile(
-                      episode: Episode(
-                        contentId: _content!.id ?? -1,
-                        seasonNumber: seasonNum,
-                        episodeNumber: epNum,
-                        title: epData['name'] as String?,
-                        description: epData['overview'] as String?,
-                        createdAt: DateTime.now(),
-                        updatedAt: DateTime.now(),
-                      ),
-                      mode: ManagedTileMode.normal,
-                      stagedFile: filePath != null
-                          ? StagedFile(
-                              episodeId: -1, // Not used here for linking
-                              path: filePath,
-                              isReplace: false, // Always false in New Import
-                            )
-                          : null,
-                      onImport: () => _pickSingle(seasonNum, epNum),
-                      onRemoveFile: () =>
-                          setState(() => _selectedFiles.remove(key)),
-                    );
-                  }).toList(),
+              return ExpansionTile(
+                title: Text(
+                  'Season $seasonNum',
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
+                // M3 compliant: no Theme.copyWith hack needed
+                shape: const Border(),
+                collapsedShape: const Border(),
+                initiallyExpanded: index == 0,
+                children: seasonEpisodes.map((epData) {
+                  final epNum = epData['episode_number'] as int? ?? 0;
+                  final key = 'S${seasonNum}E$epNum';
+                  final filePath = _selectedFiles[key];
+
+                  return ManagedEpisodeTile(
+                    episode: Episode(
+                      contentId: _content!.id ?? -1,
+                      seasonNumber: seasonNum,
+                      episodeNumber: epNum,
+                      title: epData['name'] as String?,
+                      description: epData['overview'] as String?,
+                      createdAt: DateTime.now(),
+                      updatedAt: DateTime.now(),
+                    ),
+                    mode: ManagedTileMode.normal,
+                    stagedFile: filePath != null
+                        ? StagedFile(
+                            episodeId: -1,
+                            path: filePath,
+                            isReplace: false,
+                          )
+                        : null,
+                    onImport: () => _pickSingle(seasonNum, epNum),
+                    onRemoveFile: () =>
+                        setState(() => _selectedFiles.remove(key)),
+                  );
+                }).toList(),
               );
             },
           ),
-          if (_isLoadingTmdb)
-            const BusyOverlay(message: 'Syncing with TMDB...'),
-          if (_isPickingFile)
-            const BusyOverlay(message: 'Accessing storage...'),
+          if (_isLoadingTmdb) const BusyOverlay(message: 'Syncing with TMDB…'),
+          if (_isPickingFile) const BusyOverlay(message: 'Accessing storage…'),
         ],
       ),
       bottomNavigationBar: _selectedFiles.isNotEmpty
           ? SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: ElevatedButton(
+                child: FilledButton.icon(
                   onPressed: _onImport,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 48),
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  icon: const Icon(Icons.download_outlined),
+                  label: Text('Import ${_selectedFiles.length} Episodes'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 52),
                   ),
-                  child: Text('Import ${_selectedFiles.length} Episodes'),
                 ),
               ),
             )

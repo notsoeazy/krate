@@ -40,9 +40,18 @@ class _RecentsScreenState extends State<RecentsScreen>
       body: TabBarView(
         controller: _tabController,
         children: const [
-          _PlaceholderView(message: 'Watch history coming soon'),
-          _PlaceholderView(message: 'Recently added items coming soon'),
-          _PlaceholderView(message: 'Completed items coming soon'),
+          _PlaceholderView(
+            icon: Icons.history,
+            message: 'Watch history coming soon',
+          ),
+          _PlaceholderView(
+            icon: Icons.new_releases_outlined,
+            message: 'Recently added items coming soon',
+          ),
+          _PlaceholderView(
+            icon: Icons.task_alt,
+            message: 'Completed items coming soon',
+          ),
         ],
       ),
     );
@@ -51,21 +60,24 @@ class _RecentsScreenState extends State<RecentsScreen>
 
 class _PlaceholderView extends StatelessWidget {
   final String message;
-  const _PlaceholderView({required this.message});
+  final IconData icon;
+  const _PlaceholderView({required this.message, required this.icon});
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.hourglass_empty,
-            size: 48,
-            color: Colors.grey.withValues(alpha: 0.3),
-          ),
+          Icon(icon, size: 56, color: theme.colorScheme.outlineVariant),
           const SizedBox(height: 16),
-          Text(message, style: const TextStyle(color: Colors.grey)),
+          Text(
+            message,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.outline,
+            ),
+          ),
         ],
       ),
     );

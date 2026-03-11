@@ -21,9 +21,7 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
   MediaManagementNotifier get _notifier =>
       ref.read(mediaManagementProvider(widget.contentId).notifier);
 
-  // -------------------------------------------------------------------------
-  // Operations
-  // -------------------------------------------------------------------------
+  // ── Operations ────────────────────────────────────────────────────────────
 
   Future<void> _runImport(Content content) async {
     final s = ref.read(mediaManagementProvider(widget.contentId));
@@ -34,8 +32,6 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
     );
 
     _notifier.markJobRunning();
-
-    // Pop immediately — job runs in background via ImportJobsNotifier
     if (mounted) Navigator.of(context).pop();
 
     ref
@@ -59,6 +55,7 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        icon: const Icon(Icons.delete_outline),
         title: const Text('Delete Media Files'),
         content: Text(
           'Delete media files for ${toDelete.length} episode(s)?\n'
@@ -69,10 +66,11 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
             ),
             child: const Text('Delete'),
           ),
@@ -130,9 +128,7 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // Build Components
-  // -------------------------------------------------------------------------
+  // ── Bottom bar ────────────────────────────────────────────────────────────
 
   Widget _buildBottomBar(
     MediaManagementState s,
@@ -154,7 +150,8 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
                   onPressed: () => _runImport(content),
                   icon: const Icon(Icons.link),
                   label: Text(
-                    'Import ${s.stagedFiles.length} File${s.stagedFiles.length == 1 ? '' : 's'}',
+                    'Import ${s.stagedFiles.length} '
+                    'File${s.stagedFiles.length == 1 ? '' : 's'}',
                   ),
                 ),
               ),
@@ -183,6 +180,7 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
     final s = ref.watch(mediaManagementProvider(widget.contentId));
     final contentAsync = ref.watch(contentProvider(widget.contentId));
     final episodesAsync = ref.watch(contentEpisodesProvider(widget.contentId));
+    final theme = Theme.of(context);
 
     return contentAsync.when(
       data: (content) {
@@ -198,7 +196,7 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
             actions: [
               if (isSeries && !s.isDeleteMode)
                 IconButton(
-                  icon: const Icon(Icons.sync),
+                  icon: const Icon(Icons.sync_outlined),
                   tooltip: 'Rescan from TMDB',
                   onPressed: s.canScan ? () => _runRescan(content) : null,
                 ),
@@ -251,11 +249,10 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
                     );
                   }
 
-                  // --- Series: group by season ---
+                  // Series: group by season
                   final seasons = <int, List<Episode>>{};
                   for (final ep in episodes) {
-                    final sNum = ep.seasonNumber ?? 0;
-                    seasons.putIfAbsent(sNum, () => []).add(ep);
+                    seasons.putIfAbsent(ep.seasonNumber ?? 0, () => []).add(ep);
                   }
                   final sortedSeasons = seasons.keys.toList()..sort();
 
@@ -270,45 +267,42 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
                           ),
                         );
 
-                      return Theme(
-                        data: Theme.of(
-                          context,
-                        ).copyWith(dividerColor: Colors.transparent),
-                        child: ExpansionTile(
-                          title: Text(
-                            'Season $seasonNum',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text(
-                            '${seasonEpisodes.where((e) => e.hasFile).length} / ${seasonEpisodes.length} Episodes',
-                          ),
-                          initiallyExpanded: index == 0,
-                          children: seasonEpisodes
-                              .map(
-                                (ep) => ManagedEpisodeTile(
-                                  episode: ep,
-                                  mode: s.isDeleteMode
-                                      ? ManagedTileMode.delete
-                                      : ManagedTileMode.normal,
-                                  isSelected: s.deleteSelections.contains(
-                                    ep.id,
-                                  ),
-                                  onSelectedChanged: (val) =>
-                                      _notifier.toggleDeleteSelection(
-                                        ep.id!,
-                                        selected: val == true,
-                                      ),
-                                  stagedFile: s.stagedFiles[ep.id],
-                                  onImport: () => _notifier.pickFile(
-                                    episodeId: ep.id!,
-                                    episodeHasFile: ep.hasFile,
-                                  ),
-                                  onRemoveFile: () =>
-                                      _notifier.removeStaged(ep.id!),
-                                ),
-                              )
-                              .toList(),
+                      return ExpansionTile(
+                        title: Text(
+                          'Season $seasonNum',
+                          style: theme.textTheme.titleMedium,
                         ),
+                        subtitle: Text(
+                          '${seasonEpisodes.where((e) => e.hasFile).length}'
+                          ' / ${seasonEpisodes.length} Episodes',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        // M3: no Theme.copyWith hack
+                        shape: const Border(),
+                        collapsedShape: const Border(),
+                        initiallyExpanded: index == 0,
+                        children: seasonEpisodes.map((ep) {
+                          return ManagedEpisodeTile(
+                            episode: ep,
+                            mode: s.isDeleteMode
+                                ? ManagedTileMode.delete
+                                : ManagedTileMode.normal,
+                            isSelected: s.deleteSelections.contains(ep.id),
+                            onSelectedChanged: (val) =>
+                                _notifier.toggleDeleteSelection(
+                                  ep.id!,
+                                  selected: val == true,
+                                ),
+                            stagedFile: s.stagedFiles[ep.id],
+                            onImport: () => _notifier.pickFile(
+                              episodeId: ep.id!,
+                              episodeHasFile: ep.hasFile,
+                            ),
+                            onRemoveFile: () => _notifier.removeStaged(ep.id!),
+                          );
+                        }).toList(),
                       );
                     },
                   );
@@ -316,13 +310,13 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, _) => Center(child: Text('Error: $e')),
               ),
-              if (s.hasJobRunning) const BusyOverlay(message: 'Processing...'),
+              if (s.hasJobRunning) const BusyOverlay(message: 'Processing…'),
               if (s.isPickerOpen)
-                const BusyOverlay(message: 'Accessing storage...'),
+                const BusyOverlay(message: 'Accessing storage…'),
             ],
           ),
           bottomNavigationBar: episodesAsync
-              .whenData((episodes) => _buildBottomBar(s, content, episodes))
+              .whenData((eps) => _buildBottomBar(s, content, eps))
               .value,
         );
       },
