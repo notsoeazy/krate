@@ -18,6 +18,7 @@ enum ImportJobStatus { queued, running, done, error }
 const kVaultFolderName = 'krate_vault';
 const kMoviesDirName = 'movies';
 const kSeriesDirName = 'series';
+const kEpisodeDirPrefix = 'Episode_';
 const kMetadataFileName = '.metadata.json';
 const kPosterFileName = '.poster.jpg';
 const kBackdropFileName = '.backdrop.jpg';

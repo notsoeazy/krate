@@ -1,5 +1,8 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart' show imageCache;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/utils/constants.dart';
 import 'package:krate/data/models/content.dart';
@@ -13,9 +16,9 @@ import 'package:krate/data/repositories/watch_progress_repository.dart';
 import 'package:krate/services/artwork_service.dart';
 import 'package:krate/services/import_service.dart';
 import 'package:krate/services/metadata_service.dart';
-import 'package:krate/services/scanner_service.dart';
 import 'package:krate/services/storage_service.dart';
 import 'package:krate/services/tmdb_service.dart';
+import 'package:krate/services/vault_sync_service.dart';
 import 'package:krate/services/watch_progress_service.dart';
 
 // UI State Providers
@@ -68,12 +71,14 @@ final importServiceProvider = Provider<ImportService>((ref) {
   );
 });
 
-final scannerServiceProvider = Provider<ScannerService>((ref) {
-  return ScannerService(
+final vaultSyncServiceProvider = Provider<VaultSyncService>((ref) {
+  return VaultSyncService(
     contentRepo: ref.read(contentRepoProvider),
     episodeRepo: ref.read(episodeRepoProvider),
     metadataService: ref.read(metadataServiceProvider),
     storageService: ref.read(storageServiceProvider),
+    tmdbService: ref.read(tmdbServiceProvider),
+    artworkService: ref.read(artworkServiceProvider),
   );
 });
 
@@ -97,8 +102,10 @@ class ImportJobsNotifier extends StateNotifier<List<ImportJob>> {
 
   void _update(ImportJob job) {
     final index = state.indexWhere((j) => j.id == job.id);
-    if (index == -1) {
+    final isNew = index == -1;
+    if (isNew) {
       state = [job, ...state];
+      _ref.read(importToastProvider.notifier).show(job, duration: const Duration(seconds: 3));
     } else {
       final updated = [...state];
       updated[index] = job;
@@ -109,7 +116,7 @@ class ImportJobsNotifier extends StateNotifier<List<ImportJob>> {
     if (job.status == ImportJobStatus.done ||
         job.status == ImportJobStatus.error) {
       _invalidateLibrary();
-      _ref.read(importToastProvider.notifier).show(job);
+      _ref.read(importToastProvider.notifier).show(job, duration: const Duration(seconds: 5));
     }
   }
 
@@ -173,6 +180,22 @@ class ImportJobsNotifier extends StateNotifier<List<ImportJob>> {
     if (content.id != null) _invalidateContentData(content.id!);
   }
 
+  Future<void> fetchMetadataMovie({
+    required ImportService service,
+    required Content content,
+  }) async {
+    await service.fetchMetadataMovie(content: content, onUpdate: _update);
+    if (content.id != null) _invalidateContentData(content.id!);
+  }
+
+  Future<void> fetchMetadataSeries({
+    required ImportService service,
+    required Content content,
+  }) async {
+    await service.fetchMetadataSeries(content: content, onUpdate: _update);
+    if (content.id != null) _invalidateContentData(content.id!);
+  }
+
   Future<void> rescanMovie({
     required ImportService service,
     required Content content,
@@ -213,14 +236,25 @@ final importJobsProvider =
 
 // Import Toast manages a single temporary toast for job completion/error
 class ImportToastNotifier extends StateNotifier<ImportJob?> {
+  Timer? _timer;
+
   ImportToastNotifier() : super(null);
 
-  void show(ImportJob job) {
+  void show(ImportJob job, {Duration duration = const Duration(seconds: 5)}) {
     state = job;
+    _timer?.cancel();
+    _timer = Timer(duration, dismiss);
   }
 
   void dismiss() {
+    _timer?.cancel();
     state = null;
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 }
 
@@ -229,39 +263,77 @@ final importToastProvider =
       (ref) => ImportToastNotifier(),
     );
 
-// Scanner state
-class ScannerNotifier
-    extends StateNotifier<({bool isScanning, double progress, String status})> {
-  final ScannerService _scanner;
+// Vault Sync state
+class VaultSyncNotifier
+    extends StateNotifier<({bool isSyncing, double progress, String status})> {
+  final VaultSyncService _service;
   final Ref _ref;
 
-  ScannerNotifier(this._scanner, this._ref)
-    : super((isScanning: false, progress: 0.0, status: ''));
+  VaultSyncNotifier(this._service, this._ref)
+    : super((isSyncing: false, progress: 0.0, status: ''));
 
-  Future<void> scan() async {
-    if (state.isScanning) return;
-    await _scanner.scan(
+  Future<void> sync() async {
+    if (state.isSyncing) return;
+    state = (isSyncing: true, progress: 0.0, status: 'Starting sync...');
+    await _service.sync(
       onProgress: (p) =>
-          state = (isScanning: true, progress: p, status: state.status),
+          state = (isSyncing: true, progress: p, status: state.status),
       onStatus: (s) => state = (
-        isScanning: state.isScanning,
+        isSyncing: state.isSyncing,
         progress: state.progress,
         status: s,
       ),
     );
-    state = (isScanning: false, progress: 1.0, status: 'Scan complete');
+    state = (isSyncing: false, progress: 1.0, status: 'Sync complete');
 
-    // Invalidate library after scan
+    // Evict cached images so that updated posters/backdrops reflect
+    imageCache.clear();
+    imageCache.clearLiveImages();
+
+    // Invalidate library after sync
     _ref.invalidate(moviesProvider);
     _ref.invalidate(seriesProvider);
+    _ref.invalidate(recentMoviesProvider);
+    _ref.invalidate(recentSeriesProvider);
+    _ref.invalidate(continueWatchingProvider);
+    _ref.invalidate(contentProvider);
+    _ref.invalidate(contentEpisodesProvider);
+    _ref.invalidate(contentEpisodeCountProvider);
+    _ref.invalidate(mergedEpisodesProvider);
+    _ref.invalidate(resumeEpisodeProvider);
+  }
+
+  Future<void> syncPod(String podPath, int contentId) async {
+    if (state.isSyncing) return;
+    state = (isSyncing: true, progress: 0.0, status: 'Syncing vault...');
+    await _service.syncPod(Directory(podPath));
+    state = (isSyncing: false, progress: 1.0, status: 'Sync complete');
+
+    // Evict cached images
+    imageCache.clear();
+    imageCache.clearLiveImages();
+    
+    // Invalidate specific content
+    _ref.invalidate(contentProvider(contentId));
+    _ref.invalidate(contentEpisodesProvider(contentId));
+    _ref.invalidate(contentEpisodeCountProvider(contentId));
+    _ref.invalidate(resumeEpisodeProvider(contentId));
+    
+    // Invalidate all aggregated views just in case
+    _ref.invalidate(moviesProvider);
+    _ref.invalidate(seriesProvider);
+    _ref.invalidate(recentMoviesProvider);
+    _ref.invalidate(recentSeriesProvider);
+    _ref.invalidate(continueWatchingProvider);
+    _ref.invalidate(mergedEpisodesProvider);
   }
 }
 
-final scannerProvider =
+final vaultSyncProvider =
     StateNotifierProvider<
-      ScannerNotifier,
-      ({bool isScanning, double progress, String status})
-    >((ref) => ScannerNotifier(ref.read(scannerServiceProvider), ref));
+      VaultSyncNotifier,
+      ({bool isSyncing, double progress, String status})
+    >((ref) => VaultSyncNotifier(ref.read(vaultSyncServiceProvider), ref));
 
 // Library data providers (async, cached per filter)
 final moviesProvider = FutureProvider.autoDispose<List<Content>>((ref) {

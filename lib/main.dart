@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/services/storage_service.dart';
-import 'package:krate/ui/screens/shell_screen.dart';
 import 'package:krate/ui/screens/storage_setup_screen.dart';
+import 'package:krate/ui/screens/startup_screen.dart';
 import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/theme.dart';
 import 'package:krate/utils/constants.dart';
+import 'package:krate/ui/widgets/global_toast_overlay.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,10 +32,11 @@ class KrateApp extends ConsumerWidget {
       theme: materialTheme.light(),
       darkTheme: materialTheme.dark(),
       themeMode: ThemeMode.dark,
+      builder: (context, child) => GlobalToastOverlay(child: child!),
       home: vaultStatus.when(
         data: (status) {
           if (status == VaultStatus.ok) {
-            return const ShellScreen();
+            return const StartupScreen();
           } else {
             return const StorageSetupScreen();
           }

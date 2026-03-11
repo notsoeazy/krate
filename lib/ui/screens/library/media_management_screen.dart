@@ -6,7 +6,6 @@ import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/widgets/busy_overlay.dart';
 import 'package:krate/ui/widgets/managed_episode_tile.dart';
 import 'package:krate/utils/constants.dart';
-import 'package:krate/utils/errors.dart';
 
 class MediaManagementScreen extends ConsumerStatefulWidget {
   final int contentId;
@@ -94,33 +93,44 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
     }
   }
 
-  Future<void> _runRescan(Content content) async {
+  Future<void> _runSync(Content content) async {
     final s = ref.read(mediaManagementProvider(widget.contentId));
     if (!s.canScan) return;
 
     _notifier.markJobRunning();
     try {
-      await ref
-          .read(importJobsProvider.notifier)
-          .rescanSeries(
-            service: ref.read(importServiceProvider),
+      final isSeries = content.contentType == ContentType.series;
+      final importJobs = ref.read(importJobsProvider.notifier);
+      final importService = ref.read(importServiceProvider);
+
+      // 1. Combined Sync: Try TMDB Fetch first
+      try {
+        if (isSeries) {
+          await importJobs.fetchMetadataSeries(
+            service: importService,
             content: content,
           );
-      ref.invalidate(contentEpisodesProvider(widget.contentId));
-      ref.invalidate(contentProvider(widget.contentId));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Series rescanned from TMDB')),
-        );
+        } else {
+          await importJobs.fetchMetadataMovie(
+            service: importService,
+            content: content,
+          );
+        }
+      } catch (e) {
+        debugPrint('[MediaManagement] Metadata fetch failed (likely offline): $e');
+        // If offline, we just continue to Vault Sync
       }
-    } catch (e) {
+
+      // 2. Vault Sync (targeted)
+      if (content.podPath != null) {
+        await ref
+            .read(vaultSyncProvider.notifier)
+            .syncPod(content.podPath!, content.id!);
+      }
+
       if (mounted) {
-        final msg = e is NoInternetException ? e.message : 'Rescan failed: $e';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(msg),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
+          const SnackBar(content: Text('Sync complete')),
         );
       }
     } finally {
@@ -198,7 +208,7 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
                 IconButton(
                   icon: const Icon(Icons.sync_outlined),
                   tooltip: 'Rescan from TMDB',
-                  onPressed: s.canScan ? () => _runRescan(content) : null,
+                  onPressed: s.canScan ? () => _runSync(content) : null,
                 ),
               if (!s.isDeleteMode)
                 IconButton(

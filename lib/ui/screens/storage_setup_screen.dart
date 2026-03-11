@@ -23,34 +23,32 @@ class _StorageSetupScreenState extends ConsumerState<StorageSetupScreen> {
 
     try {
       if (Theme.of(context).platform == TargetPlatform.android) {
-        PermissionStatus status = await Permission.storage.request();
+        // Request both simultaneously to handle older and newer Android versions
+        await [
+          Permission.storage,
+          Permission.manageExternalStorage,
+        ].request();
 
-        if (!status.isGranted) {
-          status = await Permission.manageExternalStorage.request();
-        }
+        final storageGranted = await Permission.storage.isGranted;
+        final manageGranted = await Permission.manageExternalStorage.isGranted;
 
-        if (status.isPermanentlyDenied) {
+        if (!storageGranted && !manageGranted) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: const Text(
-                  'Storage permission is required. Please enable it in settings.',
+                  'Storage permission is required to manage your media vault. Please enable it in settings.',
                 ),
                 action: SnackBarAction(
                   label: 'Settings',
                   onPressed: () => openAppSettings(),
                 ),
+                duration: const Duration(seconds: 5),
               ),
             );
           }
-          setState(() => _isLoading = false);
-          return;
-        }
-
-        if (!status.isGranted) {
           setState(() {
-            _error =
-                'Storage permission is required to manage your media vault.';
+            _error = 'Storage permission was denied.';
             _isLoading = false;
           });
           return;

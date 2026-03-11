@@ -173,10 +173,13 @@ class EpisodeTile extends ConsumerWidget {
 
   Widget _buildPlayButton(BuildContext context, ThemeData theme) {
     if (!episode.hasFile) {
-      return Icon(
-        Icons.cloud_off_outlined,
-        size: 20,
-        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+      return Padding(
+        padding: const EdgeInsets.only(right: 14),
+        child: Icon(
+          Icons.cloud_off_outlined,
+          size: 20,
+          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+        ),
       );
     }
 

@@ -147,8 +147,8 @@ class MediaCard extends ConsumerWidget {
     bool isSeries,
     AsyncValue<({int total, int available})>? episodeCountAsync,
   ) {
-    // Missing file (movie)
-    if (!isSeries && content.fileStatus == FileStatus.missing) {
+    // Missing file (movie or series)
+    if (content.fileStatus == FileStatus.missing) {
       return _BadgeChip(
         icon: Icons.block_outlined,
         color: theme.colorScheme.surfaceContainerHighest.withValues(

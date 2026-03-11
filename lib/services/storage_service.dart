@@ -138,18 +138,17 @@ class StorageService {
     return dir.path;
   }
 
-  /// Returns the expected destination file path for a movie file.
+  /// Returns the destination file path for a movie, preserving its original name.
   Future<String> movieFilePath(
     Content content,
     String podPath,
     String sourceFilePath,
   ) async {
-    final safeTitle = content.title.toSlug();
-    final ext = _ext(sourceFilePath);
-    return '$podPath/$safeTitle$ext';
+    final fileName = sourceFilePath.split(Platform.pathSeparator).last;
+    return '$podPath/$fileName';
   }
 
-  /// Returns the expected destination file path for a series episode.
+  /// Returns the destination file path for a series episode, preserving its original name.
   Future<String> episodeFilePath(
     Content content,
     String podPath,
@@ -157,12 +156,12 @@ class StorageService {
     int episode,
     String sourceFilePath,
   ) async {
-    final safeTitle = content.title.toSlug();
-    final s = 'S${season.toString().padLeft(2, '0')}';
-    final e = 'E${episode.toString().padLeft(2, '0')}';
-    final ext = _ext(sourceFilePath);
+    final fileName = sourceFilePath.split(Platform.pathSeparator).last;
     final seasonDir = await ensureSeasonDir(podPath, season);
-    return '$seasonDir/${safeTitle}_$s$e$ext';
+    final episodeStr = '$kEpisodeDirPrefix${episode.toString().padLeft(2, '0')}';
+    final episodeDir = Directory('$seasonDir/$episodeStr');
+    await episodeDir.create(recursive: true);
+    return '${episodeDir.path}/$fileName';
   }
 
   // ---------------------------------------------------------------------------
@@ -178,8 +177,4 @@ class StorageService {
     ).create(recursive: true);
   }
 
-  String _ext(String path) {
-    final i = path.lastIndexOf('.');
-    return i != -1 ? path.substring(i) : '.mp4';
-  }
 }

@@ -140,8 +140,8 @@ class ImportService {
     }
   }
 
-  // Movie Rescan
-  Future<void> rescanMovie({
+  // Fetch Metadata ONLY (TMDB -> DB -> Scribe)
+  Future<void> fetchMetadataMovie({
     required Content content,
     required OnJobUpdate onUpdate,
   }) async {
@@ -151,22 +151,18 @@ class ImportService {
 
     final job = ImportJob(
       id: const Uuid().v4(),
-      title: 'Rescanning ${content.title}',
+      title: 'Updating metadata: ${content.title}',
       contentType: ContentType.movie,
       status: ImportJobStatus.running,
       startedAt: DateTime.now(),
     );
 
-    onUpdate(
-      job.copyWith(currentStep: 'Fetching latest data...', progress: 0.0),
-    );
+    onUpdate(job.copyWith(currentStep: 'Fetching from TMDB...', progress: 0.1));
 
     try {
       final movieData = await _tmdbService.getMovieDetails(content.tmdbId!);
+      onUpdate(job.copyWith(currentStep: 'Downloading artwork...', progress: 0.3));
 
-      onUpdate(
-        job.copyWith(currentStep: 'Downloading artwork...', progress: 0.2),
-      );
       final artwork = await _artworkService.downloadArtwork(
         tmdbPosterPath: movieData['poster_path'] as String?,
         tmdbBackdropPath: movieData['backdrop_path'] as String?,
@@ -184,34 +180,26 @@ class ImportService {
       );
       await _contentRepo.update(updatedContent);
 
-      // Update the single movie episode metadata as well
       final existingEp = await _episodeRepo.getMovieEpisode(content.id!);
       if (existingEp != null) {
-        await _episodeRepo.update(
-          existingEp.copyWith(runtime: updatedContent.runtime),
-        );
+        await _episodeRepo.update(existingEp.copyWith(runtime: updatedContent.runtime));
       }
 
-      onUpdate(
-        job.copyWith(currentStep: 'Scribing metadata...', progress: 0.8),
-      );
+      onUpdate(job.copyWith(currentStep: 'Scribing metadata...', progress: 0.8));
       await _syncContentMetadata(content.id!);
 
-      onUpdate(
-        job.copyWith(
-          status: ImportJobStatus.done,
-          progress: 1.0,
-          currentStep: 'Done',
-        ),
-      );
-    } catch (e, st) {
-      debugPrint('[ImportService] Movie rescan failed: $e\n$st');
-      onUpdate(
-        job.copyWith(status: ImportJobStatus.error, error: e.toString()),
-      );
+      onUpdate(job.copyWith(status: ImportJobStatus.done, progress: 1.0, currentStep: 'Done'));
+    } catch (e) {
+      onUpdate(job.copyWith(status: ImportJobStatus.error, error: e.toString()));
       rethrow;
     }
   }
+
+  // Movie Rescan (Legacy wrapper)
+  Future<void> rescanMovie({
+    required Content content,
+    required OnJobUpdate onUpdate,
+  }) => fetchMetadataMovie(content: content, onUpdate: onUpdate);
 
   // Series scouting
   Future<void> scoutSeries({
@@ -377,11 +365,8 @@ class ImportService {
     }
   }
 
-  // Rescan refreshes TMDB metadata for existing content (requires internet)
-  // Updates an already-scouted series with the latest TMDB metadata.
-  // Preserves existing videoPath and fileStatus per episode.
-  // Throws NoInternetException when offline.
-  Future<void> rescanSeries({
+  // Fetch Metadata ONLY (TMDB -> DB -> Scribe)
+  Future<void> fetchMetadataSeries({
     required Content content,
     required OnJobUpdate onUpdate,
   }) async {
@@ -391,22 +376,18 @@ class ImportService {
 
     final job = ImportJob(
       id: const Uuid().v4(),
-      title: 'Rescanning ${content.title}',
+      title: 'Updating metadata: ${content.title}',
       contentType: ContentType.series,
       status: ImportJobStatus.running,
       startedAt: DateTime.now(),
     );
 
-    onUpdate(
-      job.copyWith(currentStep: 'Fetching latest data...', progress: 0.0),
-    );
+    onUpdate(job.copyWith(currentStep: 'Fetching from TMDB...', progress: 0.1));
 
     try {
       final seriesData = await _tmdbService.getSeriesDetails(content.tmdbId!);
+      onUpdate(job.copyWith(currentStep: 'Downloading artwork...', progress: 0.2));
 
-      onUpdate(
-        job.copyWith(currentStep: 'Downloading artwork...', progress: 0.1),
-      );
       final artwork = await _artworkService.downloadArtwork(
         tmdbPosterPath: seriesData['poster_path'] as String?,
         tmdbBackdropPath: seriesData['backdrop_path'] as String?,
@@ -424,73 +405,46 @@ class ImportService {
       );
       await _contentRepo.update(updatedContent);
 
-      onUpdate(
-        job.copyWith(currentStep: 'Updating episodes...', progress: 0.3),
-      );
-
       int processedSeasons = 0;
       for (int s = 1; s <= updatedContent.totalSeasons; s++) {
         try {
-          final seasonData = await _tmdbService.getSeasonDetails(
-            content.tmdbId!,
-            s,
-          );
+          final seasonData = await _tmdbService.getSeasonDetails(content.tmdbId!, s);
           final epList = (seasonData['episodes'] as List?) ?? [];
           for (final eData in epList) {
             final epData = eData as Map<String, dynamic>;
             final epNum = epData['episode_number'] as int? ?? 0;
-            final existing = await _episodeRepo.getSeriesEpisode(
-              content.id!,
-              s,
-              epNum,
-            );
+            final existing = await _episodeRepo.getSeriesEpisode(content.id!, s, epNum);
             final updated = Episode.fromTmdbEpisode(epData, content.id!);
             if (existing == null) {
               await _episodeRepo.insert(updated);
             } else {
-              // Preserve file linking data
-              await _episodeRepo.update(
-                updated.copyWith(
-                  id: existing.id,
-                  videoPath: existing.videoPath,
-                  fileStatus: existing.fileStatus,
-                ),
-              );
+              await _episodeRepo.update(updated.copyWith(
+                id: existing.id,
+                videoPath: existing.videoPath,
+                fileStatus: existing.fileStatus,
+              ));
             }
           }
-        } catch (e) {
-          debugPrint('[ImportService] Rescan: error fetching season $s: $e');
-        }
+        } catch (_) {}
         processedSeasons++;
-        onUpdate(
-          job.copyWith(
-            currentStep: 'Season $s updated',
-            progress:
-                0.3 + (processedSeasons / updatedContent.totalSeasons) * 0.6,
-          ),
-        );
+        onUpdate(job.copyWith(progress: 0.2 + (processedSeasons / updatedContent.totalSeasons) * 0.7));
       }
 
-      onUpdate(
-        job.copyWith(currentStep: 'Scribing metadata...', progress: 0.95),
-      );
+      onUpdate(job.copyWith(currentStep: 'Scribing metadata...', progress: 0.95));
       await _syncContentMetadata(content.id!);
 
-      onUpdate(
-        job.copyWith(
-          status: ImportJobStatus.done,
-          progress: 1.0,
-          currentStep: 'Done',
-        ),
-      );
-    } catch (e, st) {
-      debugPrint('[ImportService] Rescan failed: $e\n$st');
-      onUpdate(
-        job.copyWith(status: ImportJobStatus.error, error: e.toString()),
-      );
+      onUpdate(job.copyWith(status: ImportJobStatus.done, progress: 1.0, currentStep: 'Done'));
+    } catch (e) {
+      onUpdate(job.copyWith(status: ImportJobStatus.error, error: e.toString()));
       rethrow;
     }
   }
+
+  // Series Rescan (Legacy wrapper)
+  Future<void> rescanSeries({
+    required Content content,
+    required OnJobUpdate onUpdate,
+  }) => fetchMetadataSeries(content: content, onUpdate: onUpdate);
 
   // Linking moves local media into the Vault (offline-capable)
   // Links (moves) multiple local media files to existing series episodes.

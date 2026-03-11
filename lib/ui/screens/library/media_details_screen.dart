@@ -79,20 +79,29 @@ class _MediaDetailsScaffoldState extends ConsumerState<_MediaDetailsScaffold>
     final isSeries = content.contentType == ContentType.series;
     final resumeEpisodeAsync = ref.watch(resumeEpisodeProvider(content.id!));
 
-    void resync() async {
+    void fetchMetadata() async {
       try {
         final notifier = ref.read(importJobsProvider.notifier);
         final service = ref.read(importServiceProvider);
         if (isSeries) {
-          await notifier.rescanSeries(service: service, content: content);
+          await notifier.fetchMetadataSeries(service: service, content: content);
         } else {
-          await notifier.rescanMovie(service: service, content: content);
+          await notifier.fetchMetadataMovie(service: service, content: content);
         }
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(e.toString())));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        }
+      }
+    }
+
+    void vaultSync() async {
+      if (content.podPath == null) return;
+      try {
+        await ref.read(vaultSyncProvider.notifier).syncPod(content.podPath!, content.id!);
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
         }
       }
     }
@@ -146,7 +155,8 @@ class _MediaDetailsScaffoldState extends ConsumerState<_MediaDetailsScaffold>
                     MediaManagementScreen(contentId: content.id!),
               ),
             ),
-            onResync: resync,
+            onVaultSync: vaultSync,
+            onFetchMetadata: fetchMetadata,
           ),
         ],
         flexibleSpace: FlexibleSpaceBar(
@@ -701,9 +711,14 @@ class _OverlayIconButton extends StatelessWidget {
 // M3 MenuAnchor with rounded corners and spacious menu items
 class _MoreMenuButton extends StatelessWidget {
   final VoidCallback onManage;
-  final VoidCallback onResync;
+  final VoidCallback onVaultSync;
+  final VoidCallback onFetchMetadata;
 
-  const _MoreMenuButton({required this.onManage, required this.onResync});
+  const _MoreMenuButton({
+    required this.onManage,
+    required this.onVaultSync,
+    required this.onFetchMetadata,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -724,10 +739,16 @@ class _MoreMenuButton extends StatelessWidget {
           child: const Text('Manage Media'),
         ),
         MenuItemButton(
-          leadingIcon: const Icon(Icons.refresh_outlined),
-          onPressed: onResync,
+          leadingIcon: const Icon(Icons.sync_outlined),
+          onPressed: onVaultSync,
           style: MenuItemButton.styleFrom(minimumSize: const Size(200, 48)),
-          child: const Text('Resync Metadata'),
+          child: const Text('Vault Sync'),
+        ),
+        MenuItemButton(
+          leadingIcon: const Icon(Icons.refresh_outlined),
+          onPressed: onFetchMetadata,
+          style: MenuItemButton.styleFrom(minimumSize: const Size(200, 48)),
+          child: const Text('Fetch Metadata'),
         ),
       ],
       builder: (context, controller, child) {

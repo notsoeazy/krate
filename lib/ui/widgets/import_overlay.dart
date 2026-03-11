@@ -45,9 +45,6 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
             ),
           ),
 
-        // Toast notification at the top
-        ImportToast(onExpand: () => setState(() => _isExpanded = true)),
-
         // FAB + job panel at the bottom-right
         Positioned(
           bottom: 16,

@@ -8,7 +8,7 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final storagePath = ref.watch(storageServiceProvider).getRoot();
-    final scannerState = ref.watch(scannerProvider);
+    final scannerState = ref.watch(vaultSyncProvider);
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -34,24 +34,24 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 const Divider(height: 1, indent: 16, endIndent: 16),
                 ListTile(
-                  title: const Text('Scan Library'),
-                  subtitle: scannerState.isScanning
+                  title: const Text('Vault Sync'),
+                  subtitle: scannerState.isSyncing
                       ? Text(
                           '${scannerState.status} '
                           '(${(scannerState.progress * 100).toInt()}%)',
                         )
-                      : const Text('Force a full reconciliation of the vault'),
+                      : const Text('Sync local files with the database'),
                   leading: const Icon(Icons.manage_search_outlined),
-                  trailing: scannerState.isScanning
+                  trailing: scannerState.isSyncing
                       ? const SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : null,
-                  onTap: scannerState.isScanning
+                  onTap: scannerState.isSyncing
                       ? null
-                      : () => ref.read(scannerProvider.notifier).scan(),
+                      : () => ref.read(vaultSyncProvider.notifier).sync(),
                 ),
               ],
             ),

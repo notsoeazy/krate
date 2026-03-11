@@ -216,6 +216,8 @@ class Content {
     FileStatus? fileStatus,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool clearLocalPosterPath = false,
+    bool clearLocalBackdropPath = false,
   }) {
     return Content(
       id: id ?? this.id,
@@ -236,8 +238,8 @@ class Content {
       tmdbStatus: tmdbStatus ?? this.tmdbStatus,
       tmdbPosterPath: tmdbPosterPath ?? this.tmdbPosterPath,
       tmdbBackdropPath: tmdbBackdropPath ?? this.tmdbBackdropPath,
-      localPosterPath: localPosterPath ?? this.localPosterPath,
-      localBackdropPath: localBackdropPath ?? this.localBackdropPath,
+      localPosterPath: clearLocalPosterPath ? null : (localPosterPath ?? this.localPosterPath),
+      localBackdropPath: clearLocalBackdropPath ? null : (localBackdropPath ?? this.localBackdropPath),
       podPath: podPath ?? this.podPath,
       isFavorite: isFavorite ?? this.isFavorite,
       fileStatus: fileStatus ?? this.fileStatus,
