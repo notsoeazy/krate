@@ -18,7 +18,7 @@ User ──► Riverpod Providers ──► Services ──► SQLite DB (cache)
 
 **Database:** `sqflite` — singleton `AppDatabase`. 4 tables: `content`, `episodes`, `watch_progress`, `watch_history`.
 
-**Metadata file:** `.metadata.json` inside each pod directory — if the DB is wiped, the entire library can be rebuilt by scanning these files via `ScannerService`.
+**Metadata file:** `.metadata.json` inside each pod directory — if the DB is wiped, the entire library can be rebuilt by scanning these files via `VaultSyncService`.
 
 ---
 
@@ -251,14 +251,15 @@ Progress is reported from 0.0 → 1.0 via `OnJobUpdate` callback, displayed in a
 
 ---
 
-### Phase 3: Linking (Adding Files to Existing Series Episodes)
+### Phase 3: Linking & Replacing (Manage Mode)
 
-**Screens:** `MediaManagementScreen` → `SeriesEpisodePickerScreen`
+**Screens:** `MediaManagementScreen` → `SeriesEpisodePickerScreen` / `FilePicker`
 
-After a series is already scouted (metadata exists, artwork downloaded), the user can link individual episode files at any time — no internet required.
+After a series is already scouted (metadata exists, artwork downloaded), the user can link individual episode files or replace existing ones from the **Media Management** screen.
 
-1. From **MediaManagementScreen**, the user can tap any episode row with `ManagedTileMode.manage` to pick a file for that episode.
-2. Alternatively, a batch link can be triggered which calls `ImportJobsNotifier.linkEpisodes()`.
+1. **Manage Mode**: View all episodes and their file status.
+2. **Link Mode**: Select multiple "missing" episodes and pick their files in batch.
+3. **Delete Mode**: Select multiple "ready" episodes to delete their video files from disk while preserving metadata.
 
 **`ImportService.linkEpisodes()` steps:**
 
@@ -383,5 +384,5 @@ ready   ──► missing   (after file deletion or manual removal)
 | `StorageService` | Manages the vault root, pod/season directory creation, and file path conventions. |
 | `ArtworkService` | Downloads poster and backdrop from TMDB CDN into the pod. |
 | `TMDBService` | Wraps TMDB REST API: `searchMulti`, `getMovieDetails`, `getSeriesDetails`, `getSeasonDetails`. |
-| `ScannerService` | Reconciles filesystem against DB by reading `.metadata.json` files. |
+| `VaultSyncService` | Reconciles filesystem against DB by reading `.metadata.json` files. |
 | `WatchProgressService` | Determines resume episode; saves/upserts watch progress; invalidates Riverpod providers. |

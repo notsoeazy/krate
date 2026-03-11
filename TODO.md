@@ -1,55 +1,44 @@
-# Krate - To-Do List & Roadmap
+# Krate - Project Roadmap & Tasks
 
-## MVP Features
-- [ ] **Media Management**: Refine the manage media feature to allow user to manage media files in the library.
-    - [ ] Delete media files.
-    - [ ] Link (move/copy) media files.
-    - [ ] Update UI & databse, handle missing flags when deleted.
-    - [ ] handle edge cases such as importinga and deleting at the same time.
-    
-- [ ] **Syncing**: Refine the syncing feature to allow user to sync their library with the krate_vault directory which will scan metadata.json and check for media files in the directory.
-    - [ ] Import content entry just by scanning the metadata.json file.
-    - [ ] Update database from metadata.json file.
-    - [ ] Automatically load episodes and show in the library.
+## Phase 1: Core Localization & Stabilization 🛠️
+*Goal: Ensure the library is robust, portable, and correctly captures all metadata.*
 
-- [ ] **History**: Implement history tab.
+- [ ] **Subtitle Support**: Manual picker and auto-detection of `.srt`/`.ass` files.
+- [ ] **Movie Import Fix**: Restrict file selection to media types only.
+- [ ] **Multi-File Batch Import**: Support importing media along with multiple subtitles.
+- [ ] **Search Marking**: Mark TMDB search results that are already in the library.
+- [ ] **Pod automation**: Auto-discovery of existing pod folders in vault.
+- [ ] **Delete Media**: Full deletion (metadata + files) from Library/Details screen.
 
+## Phase 2: Enhanced Playback & UX 🎬
+*Goal: Improve usability and make playback feel seamless.*
 
-Below is the list of planned features, improvements, and fixes for the Krate media vault.
+- [ ] **Subtitle Delay**: Real-time adjustment in the player.
+- [ ] **Gesture Controls**: Vertical swipes for Volume/Brightness; tap to pause.
+- [ ] **Player Screen Lock**: Prevent accidental touches during playback.
+- [ ] **Series Navigation**: "Next Episode" and "Previous Episode" buttons in player.
+- [ ] **Auto-Play**: Automatically start the next episode.
+- [ ] **Continue Watching Redesign**: Improved logic and UI for resuming content.
+- [ ] **Search Library**: Quickly find content within the Library tab.
 
-## Priority: High (Core Functionality)
-- [ ] **Subtitle Support**: Implement automatic subtitle file detection and manual picker in the player.
-- [ ] **Delete Media**: Add the ability to delete a movie or series directly from the library (including the file).
-- [ ] **Series Navigation**: Add "Next Episode" and "Previous Episode" buttons in the player.
-- [ ] **Auto-Play**: Automatically start the next episode after one finishes.
+## Phase 3: Advanced Features & Polish ✨
+*Goal: Add power-user features and final UI consistency.*
 
-## Priority: Medium (UX & Polish)
-- [ ] **Search Library**: Add a search bar to the "Library" tab to quickly find imported content.
-- [ ] **Genre Filters**: Filter media by genres (Action, Comedy, etc.) fetched from TMDB.
-- [ ] **Settings Menu**: 
-    - [ ] Change storage root directory.
-    - [ ] Toggle theme (Dark/Light).
-    - [ ] Clear cache.
-- [ ] **Watch History & Statistics**: 
-    - [ ] Dedicated screen to see everything you've watched in chronological order.
-    - [ ] User Statistics: Track total watch time, movie count, and series episode count.
-    - [ ] "Completed" tab for finished series and movies.
-- [ ] **Granular Storage Management**: 
-    - [ ] Allow deleting only the video file (keeping the library entry and metadata) to save space.
+- [ ] **Genre Filters**: Filter library by TMDB genres.
+- [ ] **Settings Menu**: Root directory selection, theming, and cache management.
+- [ ] **Watch Statistics**: Total watch time and content counters.
+- [ ] **Granular Storage**: Delete video files only while keeping metadata entries.
+- [ ] **Backup & Restore**: Export library data to a portable archive.
+- [ ] **UI Consistency**: Final polish to ensure all screens follow `ui-design.md`.
+- [ ] **External Player**: Option to open files in VLC/MX Player.
+- [ ] **Custom Collections**: User-defined playlists/groups.
 
-## Priority: Low (Advanced Features)
-- [ ] **Custom Collections**: Allow users to group content into custom "Playlists."
-- [ ] **Multi-Audio Tracks**: Add a selector for audio tracks (e.g., switches between Japanese/English dubs).
-- [ ] **Cast & Crew**: Show actor profiles and other movies they've been in on the details screen.
-- [ ] **Recommendations**: Show "Similar Movies" based on the current selection.
-- [ ] **Backup/Restore**: Export the database and artwork to a zip file for migration.
-- [ ] **External Player**: Option to open the video file in an external app like VLC or MX Player.
-
-
-## Finished / Completed ✅
-- [x] Initial UI Dashboard & Library.
-- [x] TMDB API Integration for search and metadata.
-- [x] Robust Move/Copy import logic with Android permission handling.
-- [x] Premium Player with reactive controls, skip buttons, and skip gestures.
-- [x] Automatic watch progress saving and resume.
-
+## Completed ✅
+- [x] Initial UI Dashboard & Library
+- [x] TMDB API Integration (Search & Metadata)
+- [x] Robust Move/Copy Import logic
+- [x] Media Management (Batch Link/Delete/Replace)
+- [x] Vault Sync (Service & Metadata Recovery)
+- [x] History & Completed Items tabs
+- [x] Premium Player (Controls, Progress, Resume)
+- [x] Metadata Stabilization (`.metadata.json` source of truth)
