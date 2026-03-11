@@ -55,5 +55,3 @@ flutter:
   assets:
     - .env
     - assets/
-    - assets/android/
-    - assets/ios/

@@ -28,10 +28,10 @@ class AboutSettingsCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     padding: const EdgeInsets.all(12),
-                    child: SvgPicture.asset(
-                      'assets/krate-icon.svg',
-                      placeholderBuilder: (context) =>
-                          const CircularProgressIndicator(),
+                    child: Image.asset(
+                      'assets/krate-icon_transparent.png',
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Icon(Icons.error),
                     ),
                   ),
                   const SizedBox(height: 16),

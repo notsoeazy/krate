@@ -3,7 +3,7 @@
 </h1>
 
 <p align="center">
-  <img src="assets/krate-icon.svg" width="128" height="128" alt="Krate Logo">
+  <img src="assets/krate-icon_transparent.png" width="128" height="128" alt="Krate Logo">
 </p>
 
 <p align="center">Krate is an offline-first, local media vault and player designed to manage and watch your personal collection of movies and TV series directly from your device storage.</p>
