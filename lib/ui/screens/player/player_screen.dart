@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/data/models/episode.dart';
+import 'package:krate/data/models/watch_history.dart';
 import 'package:krate/data/models/watch_progress.dart';
 import 'package:krate/providers/providers.dart';
 
@@ -22,10 +23,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   bool _isInitialized = false;
   bool _hasSeeked = false;
   Timer? _progressTimer;
+  DateTime _sessionStartTime = DateTime.now();
+  late ProviderContainer _container;
 
   @override
   void initState() {
     super.initState();
+    _sessionStartTime = DateTime.now();
     _setupPlayer();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     SystemChrome.setPreferredOrientations([
@@ -35,9 +39,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Cache the container so it can be safely used even during/after dispose()
+    _container = ProviderScope.containerOf(context, listen: false);
+  }
+
+  @override
   void dispose() {
     _progressTimer?.cancel();
-    _saveProgress();
+    final position = _controller?.videoPlayerController?.value.position;
+    final duration = _controller?.videoPlayerController?.value.duration;
+    _saveProgress(currentPosition: position, totalDuration: duration, isClosing: true);
     _controller?.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
@@ -121,17 +134,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     });
   }
 
-  Future<void> _saveProgress() async {
+  Future<void> _saveProgress({Duration? currentPosition, Duration? totalDuration, bool isClosing = false}) async {
     if (_controller == null || _episode == null) return;
 
-    final position = await _controller!.videoPlayerController?.position;
-    final duration = _controller!.videoPlayerController?.value.duration;
+    // Use our cached container reference, rather than looking up context 
+    // which fails during widget destruction.
+    final container = _container;
+
+    final position = currentPosition ?? await _controller!.videoPlayerController?.position;
+    final duration = totalDuration ?? _controller!.videoPlayerController?.value.duration;
 
     if (position == null || duration == null || duration == Duration.zero) {
       return;
     }
 
-    await ref
+    await container
         .read(watchProgressServiceProvider)
         .saveProgress(
           contentId: _episode!.contentId,
@@ -139,6 +156,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           positionMs: position.inMilliseconds,
           durationMs: duration.inMilliseconds,
         );
+
+    if (isClosing) {
+      final now = DateTime.now();
+      final sessionDuration = now.difference(_sessionStartTime);
+      if (sessionDuration.inSeconds > 5) {
+        final history = WatchHistory(
+          contentId: _episode!.contentId,
+          episodeId: _episode!.id!,
+          startedAt: _sessionStartTime,
+          finishedAt: now,
+          durationWatchedMs: sessionDuration.inMilliseconds,
+        );
+        await container.read(watchHistoryRepoProvider).record(history);
+        container.invalidate(watchHistoryListProvider);
+      }
+    }
   }
 
   void _applySeek(WatchProgress? progress) {

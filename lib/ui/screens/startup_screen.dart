@@ -11,9 +11,6 @@ class StartupScreen extends ConsumerStatefulWidget {
 }
 
 class _StartupScreenState extends ConsumerState<StartupScreen> {
-  bool _checkedDiscrepancies = false;
-  bool _hasDiscrepancies = false;
-
   @override
   void initState() {
     super.initState();
@@ -26,13 +23,26 @@ class _StartupScreenState extends ConsumerState<StartupScreen> {
     
     if (mounted) {
       if (needsSync) {
-        setState(() {
-          _hasDiscrepancies = true;
-          _checkedDiscrepancies = true;
-        });
-      } else {
-        _navigateToApp();
+        // Capture the provider container since this widget will be disposed
+        // immediately after we push Replacement the ShellScreen.
+        final container = ProviderScope.containerOf(context);
+        
+        // Just notify the user via a global SnackBar that a sync might be needed.
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Vault directory changes detected.'),
+            action: SnackBarAction(
+              label: 'Sync Now',
+              onPressed: () {
+                container.read(vaultSyncProvider.notifier).sync();
+              },
+            ),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 5),
+          ),
+        );
       }
+      _navigateToApp();
     }
   }
 
@@ -45,8 +55,8 @@ class _StartupScreenState extends ConsumerState<StartupScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final syncState = ref.watch(vaultSyncProvider);
 
+    // Just show the logo centered while scanning/loading
     return Scaffold(
       body: Center(
         child: Padding(
@@ -69,47 +79,7 @@ class _StartupScreenState extends ConsumerState<StartupScreen> {
                 ),
               ),
               const SizedBox(height: 48),
-
-              if (!_checkedDiscrepancies) ...[
-                // Just show the logo while checking in the background
-                const SizedBox.shrink(),
-              ] else if (_hasDiscrepancies && !syncState.isSyncing) ...[
-                const Icon(Icons.sync_problem, size: 48, color: Colors.orange),
-                const SizedBox(height: 16),
-                const Text(
-                  'Vault changes detected',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'The files in your vault don\'t match the database. Would you like to sync now?',
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 32),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    TextButton(
-                      onPressed: _navigateToApp,
-                      child: const Text('Skip for now'),
-                    ),
-                    const SizedBox(width: 16),
-                    FilledButton.icon(
-                      onPressed: () => ref.read(vaultSyncProvider.notifier).sync(),
-                      icon: const Icon(Icons.sync),
-                      label: const Text('Sync Vault'),
-                    ),
-                  ],
-                ),
-              ] else if (syncState.isSyncing) ...[
-                LinearProgressIndicator(value: syncState.progress),
-                const SizedBox(height: 16),
-                Text(syncState.status),
-                const SizedBox(height: 16),
-                Text('${(syncState.progress * 100).toInt()}%'),
-              ] else if (_checkedDiscrepancies && !_hasDiscrepancies) ...[
-                const SizedBox.shrink(),
-              ],
+              const CircularProgressIndicator(),
             ],
           ),
         ),

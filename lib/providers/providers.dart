@@ -125,6 +125,9 @@ class ImportJobsNotifier extends StateNotifier<List<ImportJob>> {
     _ref.invalidate(seriesProvider);
     _ref.invalidate(recentMoviesProvider);
     _ref.invalidate(recentSeriesProvider);
+    _ref.invalidate(watchHistoryListProvider);
+    _ref.invalidate(recentlyAddedAllProvider);
+    _ref.invalidate(completedContentProvider);
   }
 
   /// Invalidates episode + content providers for [contentId] so any watching
@@ -360,6 +363,30 @@ final continueWatchingProvider = FutureProvider.autoDispose<List<Content>>((
   ref,
 ) {
   return ref.read(watchProgressRepoProvider).getInProgressContent(limit: 10);
+});
+
+final watchHistoryListProvider =
+    FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
+      return ref.read(watchHistoryRepoProvider).getAll(limit: 50);
+    });
+
+final recentlyAddedAllProvider = FutureProvider.autoDispose<List<Content>>((
+  ref,
+) {
+  return ref.read(contentRepoProvider).getRecentlyAdded(limit: 50);
+});
+
+final completedContentProvider = FutureProvider.autoDispose<List<Content>>((
+  ref,
+) async {
+  final ids = await ref.read(watchHistoryRepoProvider).getCompletedContentIds();
+  final repo = ref.read(contentRepoProvider);
+  final List<Content> items = [];
+  for (final id in ids) {
+    final c = await repo.getById(id);
+    if (c != null) items.add(c);
+  }
+  return items;
 });
 
 /// Watches a specific content item reactively.

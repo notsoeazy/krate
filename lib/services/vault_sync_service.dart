@@ -117,7 +117,11 @@ class VaultSyncService {
     }
 
     final allContent = await contentRepo.getAll();
-    final dbTmdbIds = allContent.map((c) => c.tmdbId).whereType<int>().toSet();
+    final dbTmdbIds = allContent
+        .where((c) => c.fileStatus != FileStatus.missing)
+        .map((c) => c.tmdbId)
+        .whereType<int>()
+        .toSet();
 
     // Check for new folders or missing folders
     if (foundTmdbIds.length != dbTmdbIds.length) return true;
@@ -143,10 +147,27 @@ class VaultSyncService {
       }
     }
 
-    // Recovery if metadata is missing or corrupt
-    if (content == null) {
+    // Process metadata if found, or recover if missing
+    if (content != null) {
+      // metadata.json was successfully parsed!
+      // Check if we already have it in DB by TMDB ID
+      final existingDbContent = await contentRepo.getByTmdbId(tmdbId);
+      
+      if (existingDbContent != null) {
+        // Exists in DB, we just grab its ID and ensure podPath is fresh
+        content = existingDbContent.copyWith(podPath: pod.path);
+      } else {
+        // COMPLETELY NEW TO DB AND WE ARE OFFLINE!
+        // We trust the metadata.json completely and insert it directly.
+        content = content.copyWith(podPath: pod.path);
+        final id = await contentRepo.upsert(content);
+        content = content.copyWith(id: id);
+      }
+    } else {
+      // metadata.json missing or corrupt. We must recover from DB or TMDB.
       debugPrint('[VaultSync] Recovering metadata for TMDB ID $tmdbId');
       content = await contentRepo.getByTmdbId(tmdbId);
+      
       if (content == null) {
         // Not in DB either - try fetching from TMDB (needs internet)
         try {
@@ -166,12 +187,11 @@ class VaultSyncService {
           return; // Skip this pod if we can't get basic info
         }
       } else {
-        // If content was found in DB but podPath was null, update it
+        // Found in DB, ensure podPath is correct
         if (content.podPath == null || content.podPath != pod.path) {
           content = content.copyWith(podPath: pod.path);
         }
       }
-      // If we found it in DB or TMDB, we'll scribe it later after check
     }
 
     // 2. Comprehensive Integrity Check
