@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:krate/ui/widgets/unavailable_overlay.dart';
 
 class RecentMediaCard extends StatelessWidget {
   final String title;
@@ -7,6 +8,7 @@ class RecentMediaCard extends StatelessWidget {
   final String? tagText;
   final String? localPosterPath;
   final Widget? progressIndicator;
+  final bool isUnavailable;
   final VoidCallback onTap;
 
   const RecentMediaCard({
@@ -16,6 +18,7 @@ class RecentMediaCard extends StatelessWidget {
     this.tagText,
     this.localPosterPath,
     this.progressIndicator,
+    this.isUnavailable = false,
     required this.onTap,
   });
 
@@ -38,13 +41,17 @@ class RecentMediaCard extends StatelessWidget {
                 // Poster
                 SizedBox(
                   width: 84, // Slightly wider for 2:3 ratio against 120 height approx
-                  child: localPosterPath != null && File(localPosterPath!).existsSync()
-                      ? Image.file(
-                          File(localPosterPath!),
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => _buildPlaceholderIcon(),
-                        )
-                      : _buildPlaceholderIcon(),
+                  child: UnavailableOverlay(
+                    isUnavailable: isUnavailable,
+                    borderRadius: 0,
+                    child: localPosterPath != null && File(localPosterPath!).existsSync()
+                        ? Image.file(
+                            File(localPosterPath!),
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => _buildPlaceholderIcon(),
+                          )
+                        : _buildPlaceholderIcon(),
+                  ),
                 ),
                 
                 Expanded(

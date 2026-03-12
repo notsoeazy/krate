@@ -368,8 +368,19 @@ final recentSeriesProvider = FutureProvider.autoDispose<List<Content>>((ref) {
 
 final continueWatchingProvider = FutureProvider.autoDispose<List<Content>>((
   ref,
-) {
-  return ref.read(watchProgressRepoProvider).getInProgressContent(limit: 10);
+) async {
+  final contentList =
+      await ref.read(watchProgressRepoProvider).getInProgressContent(limit: 10);
+
+  // Filter out content that is fully completed (no resume episode)
+  final results = await Future.wait(
+    contentList.map((c) async {
+      final resumeEpisode = await ref.watch(resumeEpisodeProvider(c.id!).future);
+      return resumeEpisode != null ? c : null;
+    }),
+  );
+
+  return results.whereType<Content>().toList();
 });
 
 final watchHistoryListProvider =

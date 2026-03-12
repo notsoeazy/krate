@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/utils/constants.dart';
 import 'package:krate/data/models/content.dart';
 import 'package:krate/providers/providers.dart';
+import 'package:krate/ui/widgets/unavailable_overlay.dart';
 
 class MediaCard extends ConsumerWidget {
   final Content content;
@@ -30,6 +31,11 @@ class MediaCard extends ConsumerWidget {
         ? ref.watch(contentEpisodeCountProvider(content.id!))
         : null;
 
+    final isUnavailable = isSeries
+        ? (episodeCountAsync?.valueOrNull?.available ?? 0) == 0 &&
+            (episodeCountAsync?.valueOrNull?.total ?? 0) > 0
+        : content.fileStatus == FileStatus.missing;
+
     return SizedBox(
       width: width,
       child: InkWell(
@@ -47,7 +53,11 @@ class MediaCard extends ConsumerWidget {
                     child: Card(
                       margin: EdgeInsets.zero,
                       clipBehavior: Clip.antiAlias,
-                      child: _buildImage(context),
+                      child: UnavailableOverlay(
+                        isUnavailable: isUnavailable,
+                        borderRadius: 12,
+                        child: _buildImage(context),
+                      ),
                     ),
                   ),
                   // Favorite badge (top-left)

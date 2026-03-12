@@ -53,7 +53,7 @@ class WatchProgressRepository {
       SELECT DISTINCT c.*
       FROM watch_progress wp
       JOIN content c ON c.id = wp.contentId
-      WHERE wp.isFinished = 0 AND wp.positionMs > 0
+      WHERE wp.positionMs > 0
       ORDER BY wp.lastWatchedAt DESC
       LIMIT ?
       ''',

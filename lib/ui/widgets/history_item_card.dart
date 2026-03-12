@@ -38,11 +38,14 @@ class HistoryItemCard extends ConsumerWidget {
       }
     }
 
+    final isUnavailable = row['fileStatus'] == 'missing';
+
     return RecentMediaCard(
       title: title,
       subtitle: subtitle,
       tagText: dateText.isNotEmpty ? 'Watched $dateText' : null,
       localPosterPath: localPosterPath,
+      isUnavailable: isUnavailable,
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(

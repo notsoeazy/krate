@@ -44,7 +44,7 @@ class WatchHistoryRepository {
     return db.rawQuery(
       '''
       SELECT wh.*, c.title, c.contentType, c.localPosterPath, c.podPath,
-             e.seasonNumber, e.episodeNumber, e.title AS episodeTitle
+             e.seasonNumber, e.episodeNumber, e.title AS episodeTitle, e.fileStatus
       FROM watch_history wh
       JOIN content c ON c.id = wh.contentId
       JOIN episodes e ON e.id = wh.episodeId

@@ -27,23 +27,36 @@ class WatchProgressService {
     final readyEpisodes = allEpisodes
         .where((ep) => ep.fileStatus == FileStatus.ready)
         .toList();
-    if (readyEpisodes.isEmpty) {
-      return allEpisodes.first; // No files, fallback to first metadata
-    }
 
-    // Check for most recently watched unfinished episode that is ready
+    // Check for most recently watched progress for this content
     final inProgress = await _progressRepo.getInProgress(limit: 100);
     final contentProgress = inProgress.where(
       (row) => row['contentId'] == contentId,
     );
 
     if (contentProgress.isNotEmpty) {
-      final episodeId = contentProgress.first['episodeId'] as int;
+      final row = contentProgress.first;
+      final episodeId = row['episodeId'] as int;
+      final isFinished = (row['isFinished'] as int) == 1;
+
       final ep = await _episodeRepo.getById(episodeId);
-      if (ep != null && ep.fileStatus == FileStatus.ready) return ep;
+      if (ep != null) {
+        if (!isFinished) {
+          // If current episode is not finished, resume it (even if file is missing, UI handles it)
+          return ep;
+        } else {
+          // If finished, try to find the next one
+          final nextEp = await _episodeRepo.getNextEpisode(ep);
+          if (nextEp != null) return nextEp;
+          
+          // If no next episode, this content is truly finished
+          return null;
+        }
+      }
     }
 
-    // If nothing is in progress, find the next episode after the latest finished one
+    // If nothing in progress or no matches, find the next episode after the latest finished one
+    // (This handles cases where progress might have been cleared or synced)
     Episode? latestFinished;
     for (final ep in allEpisodes) {
       final progress = await _progressRepo.getByEpisodeId(ep.id!);
@@ -55,19 +68,12 @@ class WatchProgressService {
     }
 
     if (latestFinished != null) {
-      // Try to find the next available episode after this one
-      final currentIndex = allEpisodes.indexOf(latestFinished);
-      for (int i = currentIndex + 1; i < allEpisodes.length; i++) {
-        if (allEpisodes[i].fileStatus == FileStatus.ready) {
-          return allEpisodes[i];
-        }
-      }
-      // If none forward, maybe stay on the last finished one if it's ready
-      if (latestFinished.fileStatus == FileStatus.ready) return latestFinished;
+      final nextEp = await _episodeRepo.getNextEpisode(latestFinished);
+      return nextEp; // Can be null if it was the last episode
     }
 
-    // Default to the first available ready episode
-    return readyEpisodes.first;
+    // Default to the first available ready episode if possible, otherwise first metadata
+    return readyEpisodes.isNotEmpty ? readyEpisodes.first : allEpisodes.first;
   }
 
   // Saves or updates watch progress for an episode.

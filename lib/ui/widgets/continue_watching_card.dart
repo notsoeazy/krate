@@ -6,6 +6,7 @@ import 'package:krate/data/models/content.dart';
 import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/screens/library/media_details_screen.dart';
 import 'package:krate/ui/screens/player/player_screen.dart';
+import 'package:krate/ui/widgets/unavailable_overlay.dart';
 import 'package:krate/utils/constants.dart';
 
 class ContinueWatchingCard extends ConsumerWidget {
@@ -227,6 +228,15 @@ class ContinueWatchingCard extends ConsumerWidget {
                     backgroundColor: Colors.transparent,
                     color: theme.colorScheme.primary,
                     minHeight: 3,
+                  ),
+                ),
+
+              // Unavailable Overlay
+              if (episode != null && !episode.hasFile)
+                Positioned.fill(
+                  child: const UnavailableOverlay(
+                    isUnavailable: true,
+                    borderRadius: 12,
                   ),
                 ),
             ],
