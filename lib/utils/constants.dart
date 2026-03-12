@@ -37,3 +37,7 @@ const kFinishedThreshold = 0.92;
 // Typography — Google Fonts family names
 const kBodyFont = 'Inter';
 const kDisplayFont = 'Inter';
+
+// File Extensions
+const kAllowedVideoExtensions = ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'webm', 'flv'];
+const kAllowedSubtitleExtensions = ['srt', 'vtt', 'ass', 'ssa'];

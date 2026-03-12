@@ -13,6 +13,7 @@ class ManagedEpisodeTile extends StatelessWidget {
   final VoidCallback? onImport;
   final StagedFile? stagedFile;
   final VoidCallback? onRemoveFile;
+  final VoidCallback? onAddSubtitles;
 
   const ManagedEpisodeTile({
     super.key,
@@ -23,6 +24,7 @@ class ManagedEpisodeTile extends StatelessWidget {
     this.onImport,
     this.stagedFile,
     this.onRemoveFile,
+    this.onAddSubtitles,
   });
 
   @override
@@ -44,31 +46,90 @@ class ManagedEpisodeTile extends StatelessWidget {
                 : theme.colorScheme.onSurface.withValues(alpha: 0.38),
           ),
         ),
-        // File Status Subtitle
-        subtitle: _buildSubtitle(theme),
-        // Episode Number Leading
+        subtitle: _buildSubtitleColumn(theme),
         secondary: _buildEpisodeNumber(theme),
         controlAffinity: ListTileControlAffinity.leading,
       );
     }
 
     // Normal Mode
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: _buildEpisodeNumber(theme),
-      title: Text(
-        episode.title ?? 'Episode ${episode.episodeNumber}',
-        style: theme.textTheme.bodyLarge?.copyWith(
-          fontWeight: FontWeight.w600,
-          color: episode.hasFile || stagedFile != null
-              ? null
-              : theme.colorScheme.onSurface.withValues(alpha: 0.38),
+    return Column(
+      children: [
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          leading: _buildEpisodeNumber(theme),
+          title: Text(
+            episode.title ?? 'Episode ${episode.episodeNumber}',
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: episode.hasFile || stagedFile != null
+                  ? null
+                  : theme.colorScheme.onSurface.withValues(alpha: 0.38),
+            ),
+          ),
+          subtitle: _buildSubtitle(theme),
+          trailing: _buildTrailing(theme),
         ),
+        if (_hasSubtitles) _buildSubtitleList(theme),
+      ],
+    );
+  }
+
+  bool get _hasSubtitles => episode.subtitles.isNotEmpty || (stagedFile?.subtitlePaths.isNotEmpty ?? false);
+
+  Widget _buildSubtitleList(ThemeData theme) {
+    final paths = stagedFile?.subtitlePaths ?? episode.subtitles.map((s) => s.path).toList();
+    return Padding(
+      padding: const EdgeInsets.only(left: 72.0, right: 16.0, bottom: 8.0),
+      child: Row(
+        children: [
+          const Icon(Icons.subtitles, size: 14, color: Colors.grey),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _formatSubtitleList(paths),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.outline,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
-      // File Status Subtitle
-      subtitle: _buildSubtitle(theme),
-      // Action Buttons
-      trailing: _buildTrailing(theme),
+    );
+  }
+
+  String _formatSubtitleList(List<String> paths) {
+    if (paths.isEmpty) return '';
+    final names = paths.map((p) => p.split('/').last).toList();
+    if (names.length <= 1) return names.first;
+    return '${names.first} +${names.length - 1}';
+  }
+
+  Widget _buildSubtitleColumn(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSubtitle(theme)!,
+        if (_hasSubtitles) ...[
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Icon(Icons.subtitles, size: 12, color: Colors.grey),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  _formatSubtitleList(stagedFile?.subtitlePaths ?? episode.subtitles.map((s) => s.path).toList()),
+                  style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 
@@ -85,7 +146,7 @@ class ManagedEpisodeTile extends StatelessWidget {
         '${episode.episodeNumber ?? ''}',
         style: theme.textTheme.titleSmall?.copyWith(
           fontWeight: FontWeight.bold,
-          color: episode.hasFile
+          color: episode.hasFile || stagedFile != null
               ? theme.colorScheme.primary
               : theme.colorScheme.onSurface.withValues(alpha: 0.3),
         ),
@@ -143,19 +204,28 @@ class ManagedEpisodeTile extends StatelessWidget {
   }
 
   Widget _buildTrailing(ThemeData theme) {
-    if (stagedFile != null) {
-      return IconButton(
-        icon: const Icon(Icons.close, size: 20),
-        onPressed: onRemoveFile,
-        tooltip: 'Remove selected file',
-      );
-    }
-
-    return IconButton(
-      icon: Icon(episode.hasFile ? Icons.swap_horiz : Icons.add_circle_outline),
-      color: episode.hasFile ? theme.colorScheme.primary : null,
-      onPressed: onImport,
-      tooltip: episode.hasFile ? 'Replace File' : 'Import File',
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (episode.hasFile || stagedFile != null)
+          IconButton(
+            icon: const Icon(Icons.subtitles_outlined, size: 20),
+            onPressed: onAddSubtitles,
+            tooltip: 'Add Subtitles',
+          ),
+        IconButton(
+          icon: Icon(stagedFile != null
+              ? Icons.close
+              : (episode.hasFile ? Icons.swap_horiz : Icons.add_circle_outline)),
+          color: (episode.hasFile || stagedFile != null)
+              ? (stagedFile != null ? theme.colorScheme.error : theme.colorScheme.primary)
+              : null,
+          onPressed: stagedFile != null ? onRemoveFile : onImport,
+          tooltip: stagedFile != null
+              ? 'Remove selected file'
+              : (episode.hasFile ? 'Replace File' : 'Import File'),
+        ),
+      ],
     );
   }
 }

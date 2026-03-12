@@ -4,6 +4,7 @@ import 'package:krate/utils/constants.dart';
 import 'package:krate/utils/errors.dart';
 import 'package:krate/data/models/content.dart';
 import 'package:krate/data/models/episode.dart';
+import 'package:krate/data/models/subtitle.dart';
 import 'package:path/path.dart' as p;
 
 // Handles reading and writing the .metadata.json scribe file.
@@ -58,11 +59,20 @@ class MetadataService {
           'videoPath': e.videoPath != null
               ? p.relative(e.videoPath!, from: podPath)
               : null,
+          'subtitles': e.subtitles.map((s) => {
+            'name': s.name,
+            'path': p.relative(s.path, from: podPath),
+          }).toList(),
           'fileStatus': e.fileStatus.name,
         };
       }).toList();
     } else if (episodes.isNotEmpty && episodes.first.videoPath != null) {
-      data['videoPath'] = p.relative(episodes.first.videoPath!, from: podPath);
+      final ep = episodes.first;
+      data['videoPath'] = p.relative(ep.videoPath!, from: podPath);
+      data['subtitles'] = ep.subtitles.map((s) => {
+        'name': s.name,
+        'path': p.relative(s.path, from: podPath),
+      }).toList();
     }
 
     final file = File(p.join(podPath, kMetadataFileName));
@@ -136,10 +146,22 @@ class MetadataService {
     if (contentType == ContentType.movie) {
       final relPath = data['videoPath'] as String?;
       final absPath = relPath != null ? p.join(podPath, relPath) : null;
+      final subs = <Subtitle>[];
+      if (data['subtitles'] != null) {
+        for (final s in data['subtitles'] as List) {
+          final sMap = s as Map<String, dynamic>;
+          subs.add(Subtitle(
+            episodeId: -1,
+            name: sMap['name'] as String,
+            path: p.join(podPath, sMap['path'] as String),
+          ));
+        }
+      }
       episodes.add(
         Episode(
           contentId: -1,
           videoPath: absPath,
+          subtitles: subs,
           runtime: data['runtime'] as int?,
           fileStatus: absPath != null ? FileStatus.ready : FileStatus.missing,
           createdAt: now,
@@ -151,6 +173,17 @@ class MetadataService {
         final epMap = ep as Map<String, dynamic>;
         final relPath = epMap['videoPath'] as String?;
         final absPath = relPath != null ? p.join(podPath, relPath) : null;
+        final subs = <Subtitle>[];
+        if (epMap['subtitles'] != null) {
+          for (final s in epMap['subtitles'] as List) {
+            final sMap = s as Map<String, dynamic>;
+            subs.add(Subtitle(
+              episodeId: -1,
+              name: sMap['name'] as String,
+              path: p.join(podPath, sMap['path'] as String),
+            ));
+          }
+        }
         episodes.add(
           Episode(
             contentId: -1,
@@ -163,6 +196,7 @@ class MetadataService {
                 : null,
             runtime: epMap['runtime'] as int?,
             videoPath: absPath,
+            subtitles: subs,
             fileStatus: FileStatus.values.firstWhere(
               (e) => e.name == (epMap['fileStatus'] as String?),
               orElse: () => FileStatus.missing,

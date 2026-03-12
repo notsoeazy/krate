@@ -152,10 +152,12 @@ class ImportJobsNotifier extends StateNotifier<List<ImportJob>> {
     required ImportService service,
     required Content content,
     required String sourceFilePath,
+    List<String> subtitlePaths = const [],
   }) async {
     await service.scoutMovie(
       content: content,
       sourceFilePath: sourceFilePath,
+      subtitlePaths: subtitlePaths,
       onUpdate: _update,
     );
     if (content.id != null) _invalidateContentData(content.id!);
@@ -166,10 +168,12 @@ class ImportJobsNotifier extends StateNotifier<List<ImportJob>> {
     required ImportService service,
     required Content content,
     required Map<int, Map<int, String>> episodeFiles,
+    Map<int, Map<int, List<String>>> episodeSubtitles = const {},
   }) async {
     await service.scoutSeries(
       content: content,
       episodeFiles: episodeFiles,
+      episodeSubtitles: episodeSubtitles,
       onUpdate: _update,
     );
     if (content.id != null) _invalidateContentData(content.id!);
@@ -180,13 +184,31 @@ class ImportJobsNotifier extends StateNotifier<List<ImportJob>> {
     required ImportService service,
     required Content content,
     required Map<int, String> episodeFiles, // episodeId -> filePath
+    Map<int, List<String>> episodeSubtitles = const {},
   }) async {
     await service.linkEpisodes(
       content: content,
       episodeFiles: episodeFiles,
+      episodeSubtitles: episodeSubtitles,
       onUpdate: _update,
     );
     // Invalidate so MediaDetailsScreen reflects the newly linked files immediately.
+    if (content.id != null) _invalidateContentData(content.id!);
+  }
+
+  Future<void> relinkEpisode({
+    required ImportService service,
+    required Content content,
+    required Episode episode,
+    required String sourceFilePath,
+    List<String> subtitlePaths = const [],
+  }) async {
+    await service.relinkEpisode(
+      content: content,
+      episode: episode,
+      sourceFilePath: sourceFilePath,
+      subtitlePaths: subtitlePaths,
+    );
     if (content.id != null) _invalidateContentData(content.id!);
   }
 
@@ -487,6 +509,7 @@ enum ManagementMode {
 class StagedFile {
   final int episodeId;
   final String path;
+  final List<String> subtitlePaths;
 
   /// `true` when the episode already has a file — this will be a replace op.
   final bool isReplace;
@@ -494,6 +517,7 @@ class StagedFile {
   const StagedFile({
     required this.episodeId,
     required this.path,
+    this.subtitlePaths = const [],
     required this.isReplace,
   });
 }
@@ -551,7 +575,71 @@ class MediaManagementState {
 class MediaManagementNotifier extends StateNotifier<MediaManagementState> {
   MediaManagementNotifier() : super(const MediaManagementState());
 
+  /// Picks both media (1 file) and subtitles (N files) in a single dialog.
+  /// Enforces exactly 1 video file and 0+ subtitle files.
+  Future<void> pickMediaWithSubtitles({
+    required int episodeId,
+    required bool episodeHasFile,
+    required void Function(String error) onError,
+  }) async {
+    if (state.isPickerOpen || state.hasJobRunning) return;
+    state = state.copyWith(isPickerOpen: true);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: [...kAllowedVideoExtensions, ...kAllowedSubtitleExtensions],
+        allowMultiple: true,
+      );
+
+      if (result == null || result.files.isEmpty) return;
+
+      final videoFiles = result.files.where((f) {
+        final ext = f.extension?.toLowerCase() ?? '';
+        return kAllowedVideoExtensions.contains(ext);
+      }).toList();
+
+      final subtitleFiles = result.files.where((f) {
+        final ext = f.extension?.toLowerCase() ?? '';
+        return kAllowedSubtitleExtensions.contains(ext);
+      }).toList();
+
+      // Check if any invalid files (extensions not in either list) were selected
+      final hasInvalid = result.files.any((f) {
+        final ext = f.extension?.toLowerCase() ?? '';
+        return !kAllowedVideoExtensions.contains(ext) && !kAllowedSubtitleExtensions.contains(ext);
+      });
+
+      if (hasInvalid) {
+        onError('Selection contains invalid file types. Only video and subtitle files are allowed.');
+        return;
+      }
+
+      if (videoFiles.length != 1) {
+        onError('You must select exactly one video file.');
+        return;
+      }
+
+      final videoPath = videoFiles.first.path!;
+      final subPaths = subtitleFiles.map((f) => f.path).whereType<String>().toList();
+
+      state = state.copyWith(
+        stagedFiles: {
+          ...state.stagedFiles,
+          episodeId: StagedFile(
+            episodeId: episodeId,
+            path: videoPath,
+            subtitlePaths: subPaths,
+            isReplace: episodeHasFile,
+          ),
+        },
+      );
+    } finally {
+      state = state.copyWith(isPickerOpen: false);
+    }
+  }
+
   // File picker
+  @Deprecated('Use pickMediaWithSubtitles or pickSubtitles instead')
   Future<void> pickFile({
     required int episodeId,
     required bool episodeHasFile,
@@ -561,7 +649,7 @@ class MediaManagementNotifier extends StateNotifier<MediaManagementState> {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['mp4', 'mkv', 'avi', 'mov', 'wmv'],
+        allowedExtensions: kAllowedVideoExtensions,
       );
       if (result != null && result.files.single.path != null) {
         final path = result.files.single.path!;
@@ -572,6 +660,73 @@ class MediaManagementNotifier extends StateNotifier<MediaManagementState> {
               episodeId: episodeId,
               path: path,
               isReplace: episodeHasFile,
+            ),
+          },
+        );
+      }
+    } finally {
+      state = state.copyWith(isPickerOpen: false);
+    }
+  }
+
+  Future<void> pickSubtitles({
+    required int episodeId,
+    String? existingVideoPath,
+    void Function(String error)? onError,
+  }) async {
+    if (state.isPickerOpen || state.hasJobRunning) return;
+
+    // Check if we are adding subtitles to a staged file or an existing episode
+    final staged = state.stagedFiles[episodeId];
+
+    state = state.copyWith(isPickerOpen: true);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: kAllowedSubtitleExtensions,
+        allowMultiple: true,
+      );
+
+      if (result == null) return;
+
+      final hasInvalid = result.files.any((f) {
+        final ext = f.extension?.toLowerCase() ?? '';
+        return !kAllowedSubtitleExtensions.contains(ext);
+      });
+
+      if (hasInvalid) {
+        onError?.call(
+          'Selection contains invalid file types. Only subtitle files are allowed.',
+        );
+        return;
+      }
+
+      final paths =
+          result.files.map((f) => f.path).whereType<String>().toList();
+
+      if (staged != null) {
+        // Adding subtitles to a staged video file
+        state = state.copyWith(
+          stagedFiles: {
+            ...state.stagedFiles,
+            episodeId: StagedFile(
+              episodeId: episodeId,
+              path: staged.path,
+              subtitlePaths: {...staged.subtitlePaths, ...paths}.toList(),
+              isReplace: staged.isReplace,
+            ),
+          },
+        );
+      } else if (existingVideoPath != null) {
+        // Adding subtitles to an existing episode (stage it with existing video)
+        state = state.copyWith(
+          stagedFiles: {
+            ...state.stagedFiles,
+            episodeId: StagedFile(
+              episodeId: episodeId,
+              path: existingVideoPath,
+              subtitlePaths: paths,
+              isReplace: true, // It's a replace of the metadata/files essentially
             ),
           },
         );

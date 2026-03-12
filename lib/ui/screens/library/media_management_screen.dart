@@ -32,6 +32,10 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
       s.stagedFiles.values.map((f) => MapEntry(f.episodeId, f.path)),
     );
 
+    final subtitlePaths = Map<int, List<String>>.fromEntries(
+      s.stagedFiles.values.map((f) => MapEntry(f.episodeId, f.subtitlePaths)),
+    );
+
     _notifier.markJobRunning();
     if (mounted) Navigator.of(context).pop();
 
@@ -41,6 +45,7 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
           service: ref.read(importServiceProvider),
           content: content,
           episodeFiles: files,
+          episodeSubtitles: subtitlePaths,
         );
   }
 

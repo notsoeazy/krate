@@ -92,15 +92,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final dataSource = BetterPlayerDataSource(
       BetterPlayerDataSourceType.file,
       ep.videoPath!,
-      subtitles: ep.subtitlePath != null
-          ? [
-              BetterPlayerSubtitlesSource(
+      subtitles: ep.subtitles.isNotEmpty
+          ? ep.subtitles.map((s) => BetterPlayerSubtitlesSource(
                 type: BetterPlayerSubtitlesSourceType.file,
-                urls: [ep.subtitlePath!],
-                name: 'External Subtitles',
-                selectedByDefault: true,
-              ),
-            ]
+                urls: [s.path],
+                name: s.name,
+                selectedByDefault: s == ep.subtitles.first,
+              )).toList()
           : null,
     );
 

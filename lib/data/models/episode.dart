@@ -1,4 +1,5 @@
 import 'package:krate/utils/constants.dart';
+import 'package:krate/data/models/subtitle.dart';
 
 class Episode {
   final int? id;
@@ -11,8 +12,7 @@ class Episode {
   final int? runtime; // minutes
   final DateTime? airDate;
   final String? videoPath;
-  final String? subtitlePath;
-  final int subtitleDelayMs;
+  final List<Subtitle> subtitles;
   final FileStatus fileStatus;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -28,8 +28,7 @@ class Episode {
     this.runtime,
     this.airDate,
     this.videoPath,
-    this.subtitlePath,
-    this.subtitleDelayMs = 0,
+    this.subtitles = const [],
     this.fileStatus = FileStatus.missing,
     required this.createdAt,
     required this.updatedAt,
@@ -80,14 +79,12 @@ class Episode {
     'runtime': runtime,
     'airDate': airDate?.toIso8601String(),
     'videoPath': videoPath,
-    'subtitlePath': subtitlePath,
-    'subtitleDelayMs': subtitleDelayMs,
     'fileStatus': fileStatus.name,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
   };
 
-  factory Episode.fromMap(Map<String, dynamic> map) {
+  factory Episode.fromMap(Map<String, dynamic> map, {List<Subtitle> subtitles = const []}) {
     return Episode(
       id: map['id'] as int?,
       contentId: map['contentId'] as int,
@@ -100,8 +97,7 @@ class Episode {
           ? DateTime.tryParse(map['airDate'] as String)
           : null,
       videoPath: map['videoPath'] as String?,
-      subtitlePath: map['subtitlePath'] as String?,
-      subtitleDelayMs: (map['subtitleDelayMs'] as int?) ?? 0,
+      subtitles: subtitles,
       fileStatus: FileStatus.values.firstWhere(
         (e) => e.name == (map['fileStatus'] as String?),
         orElse: () => FileStatus.missing,
@@ -127,9 +123,7 @@ class Episode {
     DateTime? airDate,
     String? videoPath,
     bool clearVideoPath = false,
-    String? subtitlePath,
-    bool clearSubtitlePath = false,
-    int? subtitleDelayMs,
+    List<Subtitle>? subtitles,
     FileStatus? fileStatus,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -144,10 +138,7 @@ class Episode {
       runtime: runtime ?? this.runtime,
       airDate: airDate ?? this.airDate,
       videoPath: clearVideoPath ? null : (videoPath ?? this.videoPath),
-      subtitlePath: clearSubtitlePath
-          ? null
-          : (subtitlePath ?? this.subtitlePath),
-      subtitleDelayMs: subtitleDelayMs ?? this.subtitleDelayMs,
+      subtitles: subtitles ?? this.subtitles,
       fileStatus: fileStatus ?? this.fileStatus,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

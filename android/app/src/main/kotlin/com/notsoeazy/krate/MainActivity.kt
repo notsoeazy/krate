@@ -1,4 +1,4 @@
-package com.example.krate
+package com.notsoeazy.krate
 
 import io.flutter.embedding.android.FlutterActivity
 

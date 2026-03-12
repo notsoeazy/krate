@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/data/models/content.dart';
 import 'package:krate/data/models/episode.dart';
 import 'package:krate/providers/providers.dart';
+import 'package:krate/utils/constants.dart';
 import 'package:krate/ui/widgets/busy_overlay.dart';
 import 'package:krate/ui/widgets/managed_episode_tile.dart';
 
@@ -19,6 +20,7 @@ class SeriesEpisodePickerScreen extends ConsumerStatefulWidget {
 class _SeriesEpisodePickerScreenState
     extends ConsumerState<SeriesEpisodePickerScreen> {
   final Map<String, String> _selectedFiles = {};
+  final Map<String, List<String>> _selectedSubtitles = {};
   bool _isLoadingTmdb = true;
   bool _isPickingFile = false;
   Content? _content;
@@ -87,6 +89,7 @@ class _SeriesEpisodePickerScreenState
               Episode.fromTmdbEpisode(epData, _content!.id!).copyWith(
                 id: existingEp.id,
                 videoPath: existingEp.videoPath,
+                subtitles: existingEp.subtitles,
                 fileStatus: existingEp.fileStatus,
               ),
             );
@@ -110,17 +113,75 @@ class _SeriesEpisodePickerScreenState
     }
   }
 
-  Future<void> _pickSingle(int season, int epNum) async {
+  Future<void> _pickFilesSingle(int season, int epNum) async {
     setState(() => _isPickingFile = true);
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['mp4', 'mkv', 'avi', 'mov', 'wmv'],
+        allowedExtensions: [...kAllowedVideoExtensions, ...kAllowedSubtitleExtensions],
+        allowMultiple: true,
       );
-      if (result != null && result.files.single.path != null) {
-        setState(
-          () => _selectedFiles['S${season}E$epNum'] = result.files.single.path!,
-        );
+
+      if (result == null || result.files.isEmpty) return;
+
+      final videoFiles = result.files.where((f) {
+        final ext = f.extension?.toLowerCase() ?? '';
+        return kAllowedVideoExtensions.contains(ext);
+      }).toList();
+
+      final subtitleFiles = result.files.where((f) {
+        final ext = f.extension?.toLowerCase() ?? '';
+        return kAllowedSubtitleExtensions.contains(ext);
+      }).toList();
+
+      final hasInvalid = result.files.any((f) {
+        final ext = f.extension?.toLowerCase() ?? '';
+        return !kAllowedVideoExtensions.contains(ext) && !kAllowedSubtitleExtensions.contains(ext);
+      });
+
+      if (hasInvalid) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Selection contains invalid file types. Only video and subtitle files are allowed.')),
+          );
+        }
+        return;
+      }
+
+      if (videoFiles.length != 1) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('You must select exactly one video file.')),
+          );
+        }
+        return;
+      }
+
+      final key = 'S${season}E$epNum';
+      setState(() {
+        _selectedFiles[key] = videoFiles.first.path!;
+        _selectedSubtitles[key] = subtitleFiles.map((f) => f.path).whereType<String>().toList();
+      });
+    } finally {
+      if (mounted) setState(() => _isPickingFile = false);
+    }
+  }
+
+  Future<void> _pickAdditionalSubtitlesSingle(int season, int epNum) async {
+    setState(() => _isPickingFile = true);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: kAllowedSubtitleExtensions,
+        allowMultiple: true,
+      );
+      if (result != null) {
+        final key = 'S${season}E$epNum';
+        final newPaths = result.files.map((f) => f.path).whereType<String>().toList();
+        setState(() {
+          final existing = _selectedSubtitles[key] ?? [];
+          _selectedSubtitles[key] = {...existing, ...newPaths}.toList();
+        });
       }
     } finally {
       if (mounted) setState(() => _isPickingFile = false);
@@ -131,12 +192,19 @@ class _SeriesEpisodePickerScreenState
     if (_content == null || _selectedFiles.isEmpty) return;
 
     final Map<int, Map<int, String>> mappedFiles = {};
+    final Map<int, Map<int, List<String>>> mappedSubtitles = {};
+
     for (final entry in _selectedFiles.entries) {
       final match = RegExp(r'S(\d+)E(\d+)').firstMatch(entry.key);
       if (match != null) {
         final season = int.parse(match.group(1)!);
         final ep = int.parse(match.group(2)!);
         mappedFiles.putIfAbsent(season, () => {})[ep] = entry.value;
+        
+        final subs = _selectedSubtitles[entry.key];
+        if (subs != null && subs.isNotEmpty) {
+          mappedSubtitles.putIfAbsent(season, () => {})[ep] = subs;
+        }
       }
     }
 
@@ -146,6 +214,7 @@ class _SeriesEpisodePickerScreenState
           service: ref.read(importServiceProvider),
           content: _content!,
           episodeFiles: mappedFiles,
+          episodeSubtitles: mappedSubtitles,
         );
 
     Navigator.of(context).popUntil((route) => route.isFirst);
@@ -221,12 +290,16 @@ class _SeriesEpisodePickerScreenState
                         ? StagedFile(
                             episodeId: -1,
                             path: filePath,
+                            subtitlePaths: _selectedSubtitles[key] ?? [],
                             isReplace: false,
                           )
                         : null,
-                    onImport: () => _pickSingle(seasonNum, epNum),
-                    onRemoveFile: () =>
-                        setState(() => _selectedFiles.remove(key)),
+                    onImport: () => _pickFilesSingle(seasonNum, epNum),
+                    onAddSubtitles: () => _pickAdditionalSubtitlesSingle(seasonNum, epNum),
+                    onRemoveFile: () => setState(() {
+                      _selectedFiles.remove(key);
+                      _selectedSubtitles.remove(key);
+                    }),
                   );
                 }).toList(),
               );

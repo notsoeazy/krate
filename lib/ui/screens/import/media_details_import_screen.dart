@@ -30,6 +30,7 @@ class _MediaDetailsImportScreenState
   bool _isLoading = true;
   bool _isBusy = false;
   String? _selectedFilePath;
+  List<String> _subtitlePaths = [];
 
   @override
   void initState() {
@@ -59,16 +60,83 @@ class _MediaDetailsImportScreenState
     }
   }
 
-  Future<void> _pickFile() async {
+  Future<void> _pickFiles() async {
     setState(() => _isBusy = true);
     try {
-      final result = await FilePicker.platform.pickFiles(type: FileType.video);
-      if (result != null && result.files.single.path != null) {
-        setState(() => _selectedFilePath = result.files.single.path);
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: [...kAllowedVideoExtensions, ...kAllowedSubtitleExtensions],
+        allowMultiple: true,
+      );
+
+      if (result == null || result.files.isEmpty) return;
+
+      final videoFiles = result.files.where((f) {
+        final ext = f.extension?.toLowerCase() ?? '';
+        return kAllowedVideoExtensions.contains(ext);
+      }).toList();
+
+      final subtitleFiles = result.files.where((f) {
+        final ext = f.extension?.toLowerCase() ?? '';
+        return kAllowedSubtitleExtensions.contains(ext);
+      }).toList();
+
+      final hasInvalid = result.files.any((f) {
+        final ext = f.extension?.toLowerCase() ?? '';
+        return !kAllowedVideoExtensions.contains(ext) && !kAllowedSubtitleExtensions.contains(ext);
+      });
+
+      if (hasInvalid) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Selection contains invalid file types. Only video and subtitle files are allowed.')),
+          );
+        }
+        return;
+      }
+
+      if (videoFiles.length != 1) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('You must select exactly one video file.')),
+          );
+        }
+        return;
+      }
+
+      setState(() {
+        _selectedFilePath = videoFiles.first.path;
+        _subtitlePaths = subtitleFiles.map((f) => f.path).whereType<String>().toList();
+      });
+    } finally {
+      if (mounted) setState(() => _isBusy = false);
+    }
+  }
+
+  Future<void> _pickAdditionalSubtitles() async {
+    setState(() => _isBusy = true);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: kAllowedSubtitleExtensions,
+        allowMultiple: true,
+      );
+      if (result != null) {
+        final newPaths = result.files.map((f) => f.path).whereType<String>().toList();
+        setState(() {
+          _subtitlePaths = {..._subtitlePaths, ...newPaths}.toList();
+        });
       }
     } finally {
       if (mounted) setState(() => _isBusy = false);
     }
+  }
+
+  void _onClear() {
+    setState(() {
+      _selectedFilePath = null;
+      _subtitlePaths = [];
+    });
   }
 
   void _onConfirmImport() {
@@ -97,6 +165,7 @@ class _MediaDetailsImportScreenState
           service: ref.read(importServiceProvider),
           content: _content!,
           sourceFilePath: _selectedFilePath!,
+          subtitlePaths: _subtitlePaths,
         );
 
     Navigator.of(context).popUntil((route) => route.isFirst);
@@ -129,7 +198,10 @@ class _MediaDetailsImportScreenState
                 if (widget.type == ContentType.movie) ...[
                   FilePickerTile(
                     selectedFilePath: _selectedFilePath,
-                    onTap: _pickFile,
+                    subtitlePaths: _subtitlePaths,
+                    onPickFiles: _pickFiles,
+                    onPickSubtitles: _pickAdditionalSubtitles,
+                    onClear: _onClear,
                   ),
                   const SizedBox(height: 24),
                 ],

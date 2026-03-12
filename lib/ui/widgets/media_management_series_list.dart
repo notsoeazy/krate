@@ -60,9 +60,19 @@ class MediaManagementSeriesList extends StatelessWidget {
                 selected: val == true,
               ),
               stagedFile: state.stagedFiles[ep.id],
-              onImport: () => notifier.pickFile(
+              onImport: () => notifier.pickMediaWithSubtitles(
                 episodeId: ep.id!,
                 episodeHasFile: ep.hasFile,
+                onError: (err) => ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(err)),
+                ),
+              ),
+              onAddSubtitles: () => notifier.pickSubtitles(
+                episodeId: ep.id!,
+                existingVideoPath: ep.videoPath,
+                onError: (err) => ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(err)),
+                ),
               ),
               onRemoveFile: () => notifier.removeStaged(ep.id!),
             );

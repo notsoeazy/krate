@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 // The theme is made with the help of this tool
 // https://material-foundation.github.io/material-theme-builder/
@@ -7,22 +6,14 @@ import 'package:google_fonts/google_fonts.dart';
 // Text theme factory
 TextTheme createTextTheme(
   BuildContext context,
-  String bodyFontString,
+  String bodyFontString, // passed as 'Inter' from main.dart
   String displayFontString,
 ) {
   final baseTextTheme = Theme.of(context).textTheme;
-  final bodyTextTheme = GoogleFonts.getTextTheme(bodyFontString, baseTextTheme);
-  final displayTextTheme = GoogleFonts.getTextTheme(
-    displayFontString,
-    baseTextTheme,
-  );
-  return displayTextTheme.copyWith(
-    bodyLarge: bodyTextTheme.bodyLarge,
-    bodyMedium: bodyTextTheme.bodyMedium,
-    bodySmall: bodyTextTheme.bodySmall,
-    labelLarge: bodyTextTheme.labelLarge,
-    labelMedium: bodyTextTheme.labelMedium,
-    labelSmall: bodyTextTheme.labelSmall,
+  return baseTextTheme.apply(
+    fontFamily: bodyFontString,
+    displayColor: Theme.of(context).colorScheme.onSurface,
+    bodyColor: Theme.of(context).colorScheme.onSurface,
   );
 }
 

@@ -18,8 +18,9 @@ class AppDatabase {
 
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
       onOpen: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
@@ -70,13 +71,22 @@ class AppDatabase {
         runtime         INTEGER,
         airDate         TEXT,
         videoPath       TEXT,
-        subtitlePath    TEXT,
-        subtitleDelayMs INTEGER DEFAULT 0,
         fileStatus      TEXT    DEFAULT 'missing',
         createdAt       TEXT    NOT NULL DEFAULT (datetime('now')),
         updatedAt       TEXT    NOT NULL DEFAULT (datetime('now')),
         FOREIGN KEY (contentId) REFERENCES content(id) ON DELETE CASCADE,
         UNIQUE (contentId, seasonNumber, episodeNumber)
+      )
+    ''');
+
+    // Subtitles table for multiple subtitle files per episode
+    await db.execute('''
+      CREATE TABLE subtitles (
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        episodeId INTEGER NOT NULL,
+        path      TEXT    NOT NULL,
+        name      TEXT    NOT NULL,
+        FOREIGN KEY (episodeId) REFERENCES episodes(id) ON DELETE CASCADE
       )
     ''');
 
@@ -123,5 +133,20 @@ class AppDatabase {
     await db.execute(
       'CREATE INDEX idx_history_started ON watch_history(startedAt)',
     );
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Add subtitles table
+      await db.execute('''
+        CREATE TABLE subtitles (
+          id        INTEGER PRIMARY KEY AUTOINCREMENT,
+          episodeId INTEGER NOT NULL,
+          path      TEXT    NOT NULL,
+          name      TEXT    NOT NULL,
+          FOREIGN KEY (episodeId) REFERENCES episodes(id) ON DELETE CASCADE
+        )
+      ''');
+    }
   }
 }

@@ -4,6 +4,7 @@ import 'package:krate/utils/constants.dart';
 import 'package:krate/utils/errors.dart';
 import 'package:krate/data/models/content.dart';
 import 'package:krate/data/models/episode.dart';
+import 'package:krate/data/models/subtitle.dart';
 import 'package:krate/data/models/import_job.dart';
 import 'package:krate/data/repositories/content_repository.dart';
 import 'package:krate/data/repositories/episode_repository.dart';
@@ -12,6 +13,7 @@ import 'package:krate/services/metadata_service.dart';
 import 'package:krate/services/storage_service.dart';
 import 'package:krate/services/tmdb_service.dart';
 import 'package:uuid/uuid.dart';
+import 'package:path/path.dart' as p;
 
 // Callback used to report job progress updates.
 typedef OnJobUpdate = void Function(ImportJob job);
@@ -45,6 +47,7 @@ class ImportService {
   Future<void> scoutMovie({
     required Content content,
     required String sourceFilePath,
+    List<String> subtitlePaths = const [],
     required OnJobUpdate onUpdate,
   }) async {
     if (content.tmdbId == null) throw const TmdbIdRequiredException();
@@ -71,8 +74,28 @@ class ImportService {
       await _moveFile(
         sourceFilePath,
         destPath,
-        onProgress: (p) => onUpdate(job.copyWith(progress: 0.1 + p * 0.6)),
+        onProgress: (p) => onUpdate(job.copyWith(progress: 0.1 + p * 0.4)),
       );
+
+      // Import Subtitles
+      final subtitles = <Subtitle>[];
+      for (int i = 0; i < subtitlePaths.length; i++) {
+        final subPath = subtitlePaths[i];
+        final subName = p.basename(subPath);
+        final subDest = p.join(podPath, subName);
+        
+        onUpdate(job.copyWith(
+          currentStep: 'Importing subtitle: $subName',
+          progress: 0.5 + (i / subtitlePaths.length) * 0.2,
+        ));
+
+        await _moveFile(subPath, subDest);
+        subtitles.add(Subtitle(
+          episodeId: -1, // placeholder
+          path: subDest,
+          name: subName,
+        ));
+      }
 
       onUpdate(
         job.copyWith(currentStep: 'Downloading artwork...', progress: 0.7),
@@ -108,12 +131,15 @@ class ImportService {
         contentId: contentId,
         videoPath: destPath,
         runtime: content.runtime,
-      );
+      ).copyWith(subtitles: subtitles);
+      
       final existingEp = await _episodeRepo.getMovieEpisode(contentId);
+      final int episodeId;
       if (existingEp != null) {
-        await _episodeRepo.update(movieEp.copyWith(id: existingEp.id));
+        episodeId = existingEp.id!;
+        await _episodeRepo.update(movieEp.copyWith(id: episodeId));
       } else {
-        await _episodeRepo.insert(movieEp);
+        episodeId = await _episodeRepo.insert(movieEp);
       }
 
       onUpdate(
@@ -121,7 +147,7 @@ class ImportService {
       );
       await _metadataService.scribe(
         content: updatedContent.copyWith(id: contentId),
-        episodes: [movieEp],
+        episodes: [movieEp.copyWith(id: episodeId)],
         podPath: podPath,
       );
 
@@ -219,6 +245,7 @@ class ImportService {
   Future<void> scoutSeries({
     required Content content,
     required Map<int, Map<int, String>> episodeFiles,
+    Map<int, Map<int, List<String>>> episodeSubtitles = const {},
     required OnJobUpdate onUpdate,
   }) async {
     if (content.tmdbId == null) throw const TmdbIdRequiredException();
@@ -334,6 +361,22 @@ class ImportService {
               }
             },
           );
+
+          // Import Subtitles for this episode
+          final subtitles = <Subtitle>[];
+          final subPaths = episodeSubtitles[season]?[epNum] ?? [];
+          for (final subPath in subPaths) {
+            final subName = p.basename(subPath);
+            final episodeDir = Directory(destPath).parent.path;
+            final subDest = p.join(episodeDir, subName);
+            await _moveFile(subPath, subDest);
+            subtitles.add(Subtitle(
+              episodeId: -1,
+              path: subDest,
+              name: subName,
+            ));
+          }
+
           filesDone++;
 
           final existingEp = await _episodeRepo.getSeriesEpisode(
@@ -345,6 +388,7 @@ class ImportService {
             await _episodeRepo.update(
               existingEp.copyWith(
                 videoPath: destPath,
+                subtitles: subtitles,
                 fileStatus: FileStatus.ready,
               ),
             );
@@ -491,6 +535,7 @@ class ImportService {
   Future<void> linkEpisodes({
     required Content content,
     required Map<int, String> episodeFiles, // episodeId -> filePath
+    Map<int, List<String>> episodeSubtitles = const {}, // episodeId -> [subtitlePaths]
     required OnJobUpdate onUpdate,
   }) async {
     if (content.podPath == null) return;
@@ -507,7 +552,7 @@ class ImportService {
 
     try {
       final podPath = content.podPath!;
-      final totalFiles = episodeFiles.length;
+      final totalFiles = episodeFiles.length + episodeSubtitles.values.fold(0, (sum, subs) => sum + subs.length);
       int filesDone = 0;
 
       for (final entry in episodeFiles.entries) {
@@ -536,8 +581,28 @@ class ImportService {
         );
 
         await _moveFile(srcPath, destPath);
+        
+        // Handle subtitles for this episode (if any)
+        final subtitles = <Subtitle>[];
+        final subPaths = episodeSubtitles[episodeId] ?? [];
+        for (final subPath in subPaths) {
+          final subName = p.basename(subPath);
+          final episodeDir = Directory(destPath).parent.path;
+          final subDest = p.join(episodeDir, subName);
+          await _moveFile(subPath, subDest);
+          subtitles.add(Subtitle(
+            episodeId: episodeId,
+            path: subDest,
+            name: subName,
+          ));
+        }
+
         await _episodeRepo.update(
-          episode.copyWith(videoPath: destPath, fileStatus: FileStatus.ready),
+          episode.copyWith(
+            videoPath: destPath,
+            subtitles: subtitles,
+            fileStatus: FileStatus.ready,
+          ),
         );
         filesDone++;
       }
@@ -574,6 +639,7 @@ class ImportService {
     required Content content,
     required Episode episode,
     required String sourceFilePath,
+    List<String> subtitlePaths = const [],
   }) async {
     if (content.podPath == null || episode.id == null) return;
 
@@ -590,14 +656,40 @@ class ImportService {
 
     await _moveFile(sourceFilePath, destPath);
 
+    // Import and persist subtitles
+    final subtitles = <Subtitle>[];
+    for (final subPath in subtitlePaths) {
+      final subName = p.basename(subPath);
+      final episodeDir = Directory(destPath).parent.path;
+      final subDest = p.join(episodeDir, subName);
+      await _moveFile(subPath, subDest);
+      subtitles.add(Subtitle(
+        episodeId: episode.id!,
+        path: subDest,
+        name: subName,
+      ));
+    }
+
     final oldPath = episode.videoPath;
     await _episodeRepo.update(
-      episode.copyWith(videoPath: destPath, fileStatus: FileStatus.ready),
+      episode.copyWith(
+        videoPath: destPath,
+        subtitles: subtitles,
+        fileStatus: FileStatus.ready,
+      ),
     );
 
     if (oldPath != null && oldPath != destPath) {
       final f = File(oldPath);
       if (await f.exists()) await f.delete();
+    }
+
+    // Clean up old subtitle files if any
+    for (final sub in episode.subtitles) {
+      if (!subtitles.any((newSub) => newSub.path == sub.path)) {
+        final f = File(sub.path);
+        if (await f.exists()) await f.delete();
+      }
     }
 
     await _syncContentMetadata(content.id!);
@@ -632,8 +724,17 @@ class ImportService {
       final file = File(episode.videoPath!);
       if (await file.exists()) await file.delete();
     }
+    // Delete subtitles from disk
+    for (final sub in episode.subtitles) {
+      final file = File(sub.path);
+      if (await file.exists()) await file.delete();
+    }
     await _episodeRepo.update(
-      episode.copyWith(clearVideoPath: true, fileStatus: FileStatus.missing),
+      episode.copyWith(
+        clearVideoPath: true,
+        subtitles: [],
+        fileStatus: FileStatus.missing,
+      ),
     );
 
     if (content.podPath != null) {
