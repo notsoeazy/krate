@@ -33,8 +33,10 @@ The application is built for portability, allowing you to plug in media "pods" a
 
 - **Metadata Management**: Automatic TMDB integration for movies and series.
 - **Local Vault**: Self-contained folder structure for portability.
+- **Native Performance**: Optimized file handling on Android via native pickers, bypassing slow cache copies.
+- **Independent Subtitles**: Multi-subtitle support with centralized management for movies and episodes.
 - **Smart Playback**: Auto-resume, progress saving, and "Continue Watching" support.
-- **Media Management**: Tools to link, replace, and delete media files.
+- **Media Management**: Tools to link, replace, (re)sync, and delete media files.
 - **Vault Sync**: Reconcile your library with the filesystem in one tap.
 - **History & Progress**: Track your viewing history and completed titles.
 
@@ -63,7 +65,9 @@ To run Krate locally, ensure you have the [Flutter SDK](https://docs.flutter.dev
 
 <h2 align="center">✦ Status ✦</h2>
 
-> **Current Version:** v0.2.0-alpha  
+> **Current Version:** v0.2.1-alpha  
+> **Platform Support:** Exclusively developed and tested for **Android**. Other platforms (Linux, Windows) are currently not functional or supported, though support for these is planned for the future.
+> 
 > Krate is currently in active development. Core features for library management and playback are implemented, with further refinements planned for the beta release.
 
 ---

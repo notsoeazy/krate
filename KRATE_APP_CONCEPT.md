@@ -1,6 +1,6 @@
 # Krate — App Concept & Technical Reference
 
-Krate is an offline-first, local media manager and player built with Flutter. It manages movies and TV series stored on your device. Metadata is fetched from TMDB, artwork is downloaded and stored locally, and all state is double-written to both a local SQLite database and a `.metadata.json` file inside each media pod — so the library is portable and resilient.
+Krate is an offline-first, local media manager and player built with Flutter, currently exclusive to **Android**. It manages movies and TV series stored on your device. Metadata is fetched from TMDB, artwork is downloaded and stored locally, and all state is double-written to both a local SQLite database and a `.metadata.json` file inside each media pod — so the library is portable and resilient. Future support for Desktop (Linux, Windows) is planned.
 
 ---
 
@@ -8,8 +8,9 @@ Krate is an offline-first, local media manager and player built with Flutter. It
 
 ```
 User ──► Riverpod Providers ──► Services ──► SQLite DB (cache)
-                                       └──► .metadata.json (source of truth)
-                                       └──► Filesystem (krate_vault/)
+                                       ├──► .metadata.json (source of truth)
+                                       ├──► Filesystem (krate_vault/)
+                                       └──► MethodChannel (Android Native Picker)
 ```
 
 **State Management:** Riverpod (`flutter_riverpod`) with `FutureProvider`, `StateNotifier`, and `Provider` for dependency injection.
@@ -34,7 +35,8 @@ The vault lives inside a user-selected root folder (persisted via `SharedPrefere
     │       ├── .metadata.json                 ← Source of truth
     │       ├── poster.jpg
     │       ├── backdrop.jpg
-    │       └── Movie-Title.mp4               ← Renamed from source
+    │       ├── Movie-Title.mp4               ← Renamed from source
+    │       └── Movie-Title.en.vtt            ← Subtitles alongside media
     └── series/
         └── Series-Title_Year_TMDBID/          ← Pod folder
             ├── .metadata.json                 ← Source of truth (all episodes inside)
@@ -42,6 +44,7 @@ The vault lives inside a user-selected root folder (persisted via `SharedPrefere
             ├── backdrop.jpg
             └── Season_01/
                 ├── Series-Title_S01E01.mkv
+                ├── Series-Title_S01E01.en.srt ← Episode-specific subtitles
                 └── Series-Title_S01E02.mkv
 ```
 
@@ -141,9 +144,17 @@ Stored in the OS app-data directory (`getDatabasesPath()`). Acts as a **read cac
 | `title` | TEXT | Episode name from TMDB |
 | `runtime` | INTEGER | Minutes |
 | `videoPath` | TEXT | Absolute path to video file on disk |
-| `subtitlePath` | TEXT | Absolute path to subtitle file (`.srt`/`.ass`) |
-| `subtitleDelayMs` | INTEGER | Subtitle delay offset in milliseconds |
 | `fileStatus` | TEXT | `'ready'` or `'missing'` |
+
+### `subtitles` table
+Managed by `SubtitleRepository`. One episode can have multiple subtitle files.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | INTEGER PK | |
+| `episodeId` | INTEGER FK | References `episodes(id)` with CASCADE delete |
+| `path` | TEXT | Absolute path to the subtitle file (`.vtt`, `.srt`, `.ass`) |
+| `name` | TEXT | Display name (usually the filename) |
 
 > Movies get a single episode row with `seasonNumber = NULL`, `episodeNumber = NULL`. This unifies playback logic across both content types.
 
@@ -191,10 +202,13 @@ The import pipeline is split into two explicit phases — **Scouting** (requires
 
 **Screens:** `MediaDetailsImportScreen`
 
-1. User taps **"Pick File"** on `MediaDetailsImportScreen`. `FilePicker.platform.pickFiles(type: FileType.video)` is called. A `BusyOverlay` is shown during picker access.
-2. The selected file path is displayed as confirmation.
-3. User taps **"Import Movie"**. The screen calls `ImportJobsNotifier.importMovie()`, which runs `ImportService.scoutMovie()` as a non-blocking background job.
-4. The screen immediately pops back to Home (`Navigator.popUntil(isFirst)`).
+1. User taps **"Pick Media"** or **"Pick Subtitles"** on `MediaDetailsImportScreen`. 
+2. `FileUtils.pickFiles()` is called. 
+    - **On Android**: Uses a `MethodChannel` to trigger a native intent. This bypasses the default `file_picker` caching mechanism, returning direct UIDs/Paths and improving performance for massive 4GB+ files.
+    - **Other Platforms**: Falls back to the community `file_picker` plugin.
+3. The selected files are displayed in the staging area. Subtitles can be selected independently of the video file.
+4. User taps **"Import Movie"**. The screen calls `ImportJobsNotifier.importMovie()`, which runs `ImportService.scoutMovie()` as a non-blocking background job.
+5. The screen immediately pops back to Home (`Navigator.popUntil(isFirst)`).
 
 **`ImportService.scoutMovie()` steps:**
 
