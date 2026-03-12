@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart' show imageCache;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,11 +14,13 @@ import 'package:krate/data/repositories/watch_history_repository.dart';
 import 'package:krate/data/repositories/watch_progress_repository.dart';
 import 'package:krate/services/artwork_service.dart';
 import 'package:krate/services/import_service.dart';
+import 'package:krate/utils/errors.dart';
 import 'package:krate/services/metadata_service.dart';
 import 'package:krate/services/storage_service.dart';
 import 'package:krate/services/tmdb_service.dart';
 import 'package:krate/services/vault_sync_service.dart';
 import 'package:krate/services/watch_progress_service.dart';
+import 'package:krate/utils/file_utils.dart';
 
 // UI State Providers
 final shellTabIndexProvider = StateProvider<int>((ref) => 0);
@@ -508,7 +509,7 @@ enum ManagementMode {
 @immutable
 class StagedFile {
   final int episodeId;
-  final String path;
+  final String? path;
   final List<String> subtitlePaths;
 
   /// `true` when the episode already has a file — this will be a replace op.
@@ -516,7 +517,7 @@ class StagedFile {
 
   const StagedFile({
     required this.episodeId,
-    required this.path,
+    this.path,
     this.subtitlePaths = const [],
     required this.isReplace,
   });
@@ -585,89 +586,32 @@ class MediaManagementNotifier extends StateNotifier<MediaManagementState> {
     if (state.isPickerOpen || state.hasJobRunning) return;
     state = state.copyWith(isPickerOpen: true);
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: [...kAllowedVideoExtensions, ...kAllowedSubtitleExtensions],
-        allowMultiple: true,
+      final picked = await FileUtils.pickVideoWithSubtitles(
+        debugLabel: 'MediaManagement',
       );
 
-      if (result == null || result.files.isEmpty) return;
-
-      final videoFiles = result.files.where((f) {
-        final ext = f.extension?.toLowerCase() ?? '';
-        return kAllowedVideoExtensions.contains(ext);
-      }).toList();
-
-      final subtitleFiles = result.files.where((f) {
-        final ext = f.extension?.toLowerCase() ?? '';
-        return kAllowedSubtitleExtensions.contains(ext);
-      }).toList();
-
-      // Check if any invalid files (extensions not in either list) were selected
-      final hasInvalid = result.files.any((f) {
-        final ext = f.extension?.toLowerCase() ?? '';
-        return !kAllowedVideoExtensions.contains(ext) && !kAllowedSubtitleExtensions.contains(ext);
-      });
-
-      if (hasInvalid) {
-        onError('Selection contains invalid file types. Only video and subtitle files are allowed.');
-        return;
-      }
-
-      if (videoFiles.length != 1) {
-        onError('You must select exactly one video file.');
-        return;
-      }
-
-      final videoPath = videoFiles.first.path!;
-      final subPaths = subtitleFiles.map((f) => f.path).whereType<String>().toList();
-
-      state = state.copyWith(
-        stagedFiles: {
-          ...state.stagedFiles,
-          episodeId: StagedFile(
-            episodeId: episodeId,
-            path: videoPath,
-            subtitlePaths: subPaths,
-            isReplace: episodeHasFile,
-          ),
-        },
-      );
-    } finally {
-      state = state.copyWith(isPickerOpen: false);
-    }
-  }
-
-  // File picker
-  @Deprecated('Use pickMediaWithSubtitles or pickSubtitles instead')
-  Future<void> pickFile({
-    required int episodeId,
-    required bool episodeHasFile,
-  }) async {
-    if (state.isPickerOpen || state.hasJobRunning) return;
-    state = state.copyWith(isPickerOpen: true);
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: kAllowedVideoExtensions,
-      );
-      if (result != null && result.files.single.path != null) {
-        final path = result.files.single.path!;
+      if (picked != null) {
         state = state.copyWith(
           stagedFiles: {
             ...state.stagedFiles,
             episodeId: StagedFile(
               episodeId: episodeId,
-              path: path,
+              path: picked.videoPath,
+              subtitlePaths: picked.subtitlePaths,
               isReplace: episodeHasFile,
             ),
           },
         );
       }
+    } on KrateException catch (e) {
+      onError(e.message);
+    } catch (e) {
+      onError('An unexpected error occurred during file selection.');
     } finally {
       state = state.copyWith(isPickerOpen: false);
     }
   }
+
 
   Future<void> pickSubtitles({
     required int episodeId,
@@ -681,28 +625,11 @@ class MediaManagementNotifier extends StateNotifier<MediaManagementState> {
 
     state = state.copyWith(isPickerOpen: true);
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: kAllowedSubtitleExtensions,
-        allowMultiple: true,
+      final paths = await FileUtils.pickSubtitlesOnly(
+        debugLabel: 'MediaManagement Subtitles',
       );
 
-      if (result == null) return;
-
-      final hasInvalid = result.files.any((f) {
-        final ext = f.extension?.toLowerCase() ?? '';
-        return !kAllowedSubtitleExtensions.contains(ext);
-      });
-
-      if (hasInvalid) {
-        onError?.call(
-          'Selection contains invalid file types. Only subtitle files are allowed.',
-        );
-        return;
-      }
-
-      final paths =
-          result.files.map((f) => f.path).whereType<String>().toList();
+      if (paths == null) return;
 
       if (staged != null) {
         // Adding subtitles to a staged video file
@@ -718,15 +645,16 @@ class MediaManagementNotifier extends StateNotifier<MediaManagementState> {
           },
         );
       } else if (existingVideoPath != null) {
-        // Adding subtitles to an existing episode (stage it with existing video)
+        // Adding subtitles to an existing episode.
+        // We set path to null to indicate we are NOT replacing/touching the media file.
         state = state.copyWith(
           stagedFiles: {
             ...state.stagedFiles,
             episodeId: StagedFile(
               episodeId: episodeId,
-              path: existingVideoPath,
+              path: null, // Subtitles only
               subtitlePaths: paths,
-              isReplace: true, // It's a replace of the metadata/files essentially
+              isReplace: true,
             ),
           },
         );

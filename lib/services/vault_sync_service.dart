@@ -32,12 +32,19 @@ class VaultSyncService {
     void Function(double)? onProgress,
     void Function(String)? onStatus,
   }) async {
+    debugPrint('[VaultSync] Starting sync...');
     onStatus?.call('Gathering vault files...');
     final root = await storageService.getRoot();
-    if (root == null) return;
+    if (root == null) {
+      debugPrint('[VaultSync] Aborting: No storage root configured.');
+      return;
+    }
 
     final vaultDir = Directory('$root/$kVaultFolderName');
-    if (!await vaultDir.exists()) return;
+    if (!await vaultDir.exists()) {
+      debugPrint('[VaultSync] Aborting: Vault directory not found at ${vaultDir.path}');
+      return;
+    }
 
     final foundTmdbIds = <int>{};
     final pods = <Directory>[];
@@ -47,12 +54,19 @@ class VaultSyncService {
       final dir = Directory('${vaultDir.path}/$typeDir');
       if (await dir.exists()) {
         await for (var entity in dir.list()) {
-          if (entity is Directory) pods.add(entity);
+          if (entity is Directory) {
+            pods.add(entity);
+            final id = _extractTmdbId(entity.path);
+            if (id != null) foundTmdbIds.add(id);
+          }
         }
       }
     }
 
+    debugPrint('[VaultSync] Found ${pods.length} pods on disk.');
+
     if (pods.isEmpty) {
+      debugPrint('[VaultSync] Vault is empty.');
       onStatus?.call('Vault is empty.');
       onProgress?.call(1.0);
       return;
@@ -63,26 +77,40 @@ class VaultSyncService {
       final pod = pods[i];
       onProgress?.call(i / pods.length);
       final tmdbId = _extractTmdbId(pod.path);
+      
       if (tmdbId == null) {
-        debugPrint('[VaultSync] Could not extract TMDB ID from ${pod.path}');
+        debugPrint('[VaultSync] Skipping: Invalid folder name format: ${pod.path}');
         continue;
       }
-      foundTmdbIds.add(tmdbId);
+      
       final isSeries = pod.path.contains(kSeriesDirName);
-
+      debugPrint('[VaultSync] Syncing Pod [$tmdbId] (${isSeries ? "Series" : "Movie"}): ${_baseName(pod.path)}');
+      
       onStatus?.call('Syncing ${_baseName(pod.path)}...');
       await _syncPod(pod, tmdbId, isSeries);
     }
 
     // Detect Ghosts (DB entries not on disk)
+    debugPrint('[VaultSync] Checking for ghost entries in DB...');
     onStatus?.call('Marking missing entries...');
     final allContent = await contentRepo.getAll();
+    int markedMissing = 0;
+    
     for (final content in allContent) {
       if (content.tmdbId != null && !foundTmdbIds.contains(content.tmdbId)) {
+        if (content.fileStatus != FileStatus.ready) continue; 
+        
+        debugPrint('[VaultSync] Ghost detected: Pod folder missing for ${content.title} (ID: ${content.tmdbId}).');
         await _markContentAsMissing(content);
+        markedMissing++;
+      } else if (content.fileStatus == FileStatus.ready) {
+        // Pod exists, but maybe file was manually deleted?
+        // _syncPod already handles this and updates DB, 
+        // but we want to know if sync discovered missing files.
       }
     }
 
+    debugPrint('[VaultSync] Sync complete. Folders missing: $markedMissing. Entries reconcilled.');
     onStatus?.call('Vault sync complete');
     onProgress?.call(1.0);
   }
@@ -97,36 +125,71 @@ class VaultSyncService {
   // Quickly check if there are differences between the vault and the database.
   // Returns `true` if a sync is recommended.
   Future<bool> scout() async {
+    debugPrint('[VaultSync] Scouting vault...');
     final root = await storageService.getRoot();
     if (root == null) return false;
 
     final vaultDir = Directory('$root/$kVaultFolderName');
     if (!await vaultDir.exists()) return false;
 
-    final foundTmdbIds = <int>{};
+    final diskIds = <int>{};
     for (final typeDir in [kMoviesDirName, kSeriesDirName]) {
       final dir = Directory('${vaultDir.path}/$typeDir');
       if (await dir.exists()) {
         await for (var entity in dir.list()) {
           if (entity is Directory) {
             final id = _extractTmdbId(entity.path);
-            if (id != null) foundTmdbIds.add(id);
+            if (id != null) diskIds.add(id);
           }
         }
       }
     }
 
     final allContent = await contentRepo.getAll();
-    final dbTmdbIds = allContent
+    // We compare with ALL content in the DB. 
+    // If it's on disk but the DB doesn't know it (or thinks it's missing), we need sync.
+    // If it's in DB (not missing) but NOT on disk, we need sync.
+    final dbReadyIds = allContent
         .where((c) => c.fileStatus != FileStatus.missing)
         .map((c) => c.tmdbId)
         .whereType<int>()
         .toSet();
 
-    // Check for new folders or missing folders
-    if (foundTmdbIds.length != dbTmdbIds.length) return true;
-    if (!foundTmdbIds.every((id) => dbTmdbIds.contains(id))) return true;
+    // 1. New things on disk?
+    for (final id in diskIds) {
+      if (!dbReadyIds.contains(id)) {
+        debugPrint('[VaultSync] Scout: Found new/missing-in-db content on disk (ID: $id). Sync recommended.');
+        return true;
+      }
+    }
 
+    // 2. Gone from disk? (Folder missing)
+    for (final id in dbReadyIds) {
+      if (!diskIds.contains(id)) {
+        debugPrint('[VaultSync] Scout: Pod folder for ID: $id is no longer on disk. Sync recommended.');
+        return true;
+      }
+    }
+
+    // 3. Deep check (Media missing for movies)
+    // For series it's more expensive to scout deeply every startup, 
+    // so we prioritize movies as they are the most common "single file" case.
+    for (final content in allContent) {
+      if (content.contentType == ContentType.movie && 
+          content.fileStatus == FileStatus.ready && 
+          content.podPath != null) {
+        final podDir = Directory(content.podPath!);
+        if (await podDir.exists()) {
+          final hasVideo = await _findAnyVideoFile(podDir) != null;
+          if (!hasVideo) {
+            debugPrint('[VaultSync] Scout: Media file missing for movie "${content.title}" (ID: ${content.tmdbId}). Sync recommended.');
+            return true;
+          }
+        }
+      }
+    }
+
+    debugPrint('[VaultSync] Scout: Vault is in sync with DB.');
     return false;
   }
 
@@ -138,11 +201,12 @@ class VaultSyncService {
     final metadataFile = File('${pod.path}/$kMetadataFileName');
     if (await metadataFile.exists()) {
       try {
+        debugPrint('[VaultSync] Pod [$tmdbId]: Reading metadata.json');
         final data = await metadataService.read(metadataFile.path);
         content = data.content;
         episodes = data.episodes;
       } catch (e) {
-        debugPrint('[VaultSync] Error reading metadata at ${pod.path}: $e');
+        debugPrint('[VaultSync] Pod [$tmdbId]: Error reading metadata: $e');
       }
     }
 
@@ -242,6 +306,7 @@ class VaultSyncService {
           ),
         );
       } else {
+        debugPrint('[VaultSync] Pod [$tmdbId]: NO MEDIA FILE FOUND for movie.');
         content = content.copyWith(fileStatus: FileStatus.missing);
         syncedEpisodes.add(
           movieEpisode.copyWith(
@@ -306,6 +371,7 @@ class VaultSyncService {
             ),
           );
         } else {
+          debugPrint('[VaultSync] Pod [$tmdbId]: NO MEDIA FILE FOUND for S${seasonStr}E${episodeStr}');
           syncedEpisodes.add(
             ep.copyWith(clearVideoPath: true, fileStatus: FileStatus.missing),
           );
@@ -322,6 +388,8 @@ class VaultSyncService {
       createdAt: existing?.createdAt,
       updatedAt: DateTime.now(),
     );
+    
+    debugPrint('[VaultSync] Pod [$tmdbId]: Updating Content DB entry (${updatedContent.title})');
     await contentRepo.update(updatedContent);
 
     for (final ep in syncedEpisodes) {
@@ -339,6 +407,7 @@ class VaultSyncService {
   }
 
   Future<void> _markContentAsMissing(Content content) async {
+    debugPrint('[VaultSync] Marking content as missing: ${content.title}');
     await contentRepo.update(
       content.copyWith(
         fileStatus: FileStatus.missing,

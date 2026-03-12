@@ -1,12 +1,12 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/data/models/content.dart';
 import 'package:krate/data/models/episode.dart';
+import 'package:krate/utils/errors.dart';
 import 'package:krate/providers/providers.dart';
-import 'package:krate/utils/constants.dart';
 import 'package:krate/ui/widgets/busy_overlay.dart';
 import 'package:krate/ui/widgets/managed_episode_tile.dart';
+import 'package:krate/utils/file_utils.dart';
 
 class SeriesEpisodePickerScreen extends ConsumerStatefulWidget {
   final int tmdbId;
@@ -116,52 +116,29 @@ class _SeriesEpisodePickerScreenState
   Future<void> _pickFilesSingle(int season, int epNum) async {
     setState(() => _isPickingFile = true);
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: [...kAllowedVideoExtensions, ...kAllowedSubtitleExtensions],
-        allowMultiple: true,
+      final picked = await FileUtils.pickVideoWithSubtitles(
+        debugLabel: 'SeriesEpisodePicker S${season}E$epNum',
       );
 
-      if (result == null || result.files.isEmpty) return;
-
-      final videoFiles = result.files.where((f) {
-        final ext = f.extension?.toLowerCase() ?? '';
-        return kAllowedVideoExtensions.contains(ext);
-      }).toList();
-
-      final subtitleFiles = result.files.where((f) {
-        final ext = f.extension?.toLowerCase() ?? '';
-        return kAllowedSubtitleExtensions.contains(ext);
-      }).toList();
-
-      final hasInvalid = result.files.any((f) {
-        final ext = f.extension?.toLowerCase() ?? '';
-        return !kAllowedVideoExtensions.contains(ext) && !kAllowedSubtitleExtensions.contains(ext);
-      });
-
-      if (hasInvalid) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Selection contains invalid file types. Only video and subtitle files are allowed.')),
-          );
-        }
-        return;
+      if (picked != null) {
+        final key = 'S${season}E$epNum';
+        setState(() {
+          _selectedFiles[key] = picked.videoPath;
+          _selectedSubtitles[key] = picked.subtitlePaths;
+        });
       }
-
-      if (videoFiles.length != 1) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('You must select exactly one video file.')),
-          );
-        }
-        return;
+    } on KrateException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
       }
-
-      final key = 'S${season}E$epNum';
-      setState(() {
-        _selectedFiles[key] = videoFiles.first.path!;
-        _selectedSubtitles[key] = subtitleFiles.map((f) => f.path).whereType<String>().toList();
-      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('An unexpected error occurred.')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isPickingFile = false);
     }
@@ -170,17 +147,14 @@ class _SeriesEpisodePickerScreenState
   Future<void> _pickAdditionalSubtitlesSingle(int season, int epNum) async {
     setState(() => _isPickingFile = true);
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: kAllowedSubtitleExtensions,
-        allowMultiple: true,
+      final paths = await FileUtils.pickSubtitlesOnly(
+        debugLabel: 'SeriesEpisodePicker S${season}E$epNum',
       );
-      if (result != null) {
+      if (paths != null) {
         final key = 'S${season}E$epNum';
-        final newPaths = result.files.map((f) => f.path).whereType<String>().toList();
         setState(() {
           final existing = _selectedSubtitles[key] ?? [];
-          _selectedSubtitles[key] = {...existing, ...newPaths}.toList();
+          _selectedSubtitles[key] = {...existing, ...paths}.toList();
         });
       }
     } finally {

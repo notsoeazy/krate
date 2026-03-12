@@ -29,7 +29,9 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
     if (!s.importButtonEnabled) return;
 
     final files = Map<int, String>.fromEntries(
-      s.stagedFiles.values.map((f) => MapEntry(f.episodeId, f.path)),
+      s.stagedFiles.values
+          .where((f) => f.path != null)
+          .map((f) => MapEntry(f.episodeId, f.path!)),
     );
 
     final subtitlePaths = Map<int, List<String>>.fromEntries(

@@ -1,13 +1,14 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/utils/constants.dart';
+import 'package:krate/utils/errors.dart';
 import 'package:krate/data/models/content.dart';
 import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/widgets/busy_overlay.dart';
 import 'package:krate/ui/widgets/media_import_preview.dart';
 import 'package:krate/ui/widgets/file_picker_tile.dart';
 import 'package:krate/ui/screens/import/series_episode_picker_screen.dart';
+import 'package:krate/utils/file_utils.dart';
 
 class MediaDetailsImportScreen extends ConsumerStatefulWidget {
   final int tmdbId;
@@ -61,53 +62,29 @@ class _MediaDetailsImportScreenState
   }
 
   Future<void> _pickFiles() async {
-    setState(() => _isBusy = true);
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: [...kAllowedVideoExtensions, ...kAllowedSubtitleExtensions],
-        allowMultiple: true,
+      final picked = await FileUtils.pickVideoWithSubtitles(
+        debugLabel: 'MediaDetailsImport',
       );
 
-      if (result == null || result.files.isEmpty) return;
-
-      final videoFiles = result.files.where((f) {
-        final ext = f.extension?.toLowerCase() ?? '';
-        return kAllowedVideoExtensions.contains(ext);
-      }).toList();
-
-      final subtitleFiles = result.files.where((f) {
-        final ext = f.extension?.toLowerCase() ?? '';
-        return kAllowedSubtitleExtensions.contains(ext);
-      }).toList();
-
-      final hasInvalid = result.files.any((f) {
-        final ext = f.extension?.toLowerCase() ?? '';
-        return !kAllowedVideoExtensions.contains(ext) && !kAllowedSubtitleExtensions.contains(ext);
-      });
-
-      if (hasInvalid) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Selection contains invalid file types. Only video and subtitle files are allowed.')),
-          );
-        }
-        return;
+      if (picked != null) {
+        setState(() {
+          _selectedFilePath = picked.videoPath;
+          _subtitlePaths = picked.subtitlePaths;
+        });
       }
-
-      if (videoFiles.length != 1) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('You must select exactly one video file.')),
-          );
-        }
-        return;
+    } on KrateException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
       }
-
-      setState(() {
-        _selectedFilePath = videoFiles.first.path;
-        _subtitlePaths = subtitleFiles.map((f) => f.path).whereType<String>().toList();
-      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('An unexpected error occurred.')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isBusy = false);
     }
@@ -116,15 +93,12 @@ class _MediaDetailsImportScreenState
   Future<void> _pickAdditionalSubtitles() async {
     setState(() => _isBusy = true);
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: kAllowedSubtitleExtensions,
-        allowMultiple: true,
+      final paths = await FileUtils.pickSubtitlesOnly(
+        debugLabel: 'MediaDetailsImport',
       );
-      if (result != null) {
-        final newPaths = result.files.map((f) => f.path).whereType<String>().toList();
+      if (paths != null) {
         setState(() {
-          _subtitlePaths = {..._subtitlePaths, ...newPaths}.toList();
+          _subtitlePaths = {..._subtitlePaths, ...paths}.toList();
         });
       }
     } finally {

@@ -51,3 +51,15 @@ class NoInternetException extends KrateException {
   const NoInternetException()
     : super('No internet connection. Please check your network and try again.');
 }
+
+// File picking operations failed or were invalid.
+class FilePickingException extends KrateException {
+  const FilePickingException(String details)
+    : super('File selection invalid: $details');
+}
+
+// A video file is mandatory for this specific operation.
+class VideoRequiredException extends KrateException {
+  const VideoRequiredException()
+    : super('No video file selected. Please provide a video file first.');
+}

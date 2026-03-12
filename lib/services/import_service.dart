@@ -64,38 +64,12 @@ class ImportService {
 
     try {
       final podPath = await _storageService.ensurePodDir(content);
-      onUpdate(job.copyWith(currentStep: 'Moving file...', progress: 0.1));
-
-      final destPath = await _storageService.movieFilePath(
-        content,
-        podPath,
-        sourceFilePath,
-      );
-      await _moveFile(
-        sourceFilePath,
-        destPath,
-        onProgress: (p) => onUpdate(job.copyWith(progress: 0.1 + p * 0.4)),
-      );
+      final destPath = await _importVideo(content, Episode.forMovie(contentId: -1, videoPath: '', runtime: 0), sourceFilePath, onProgress: (p) => onUpdate(job.copyWith(progress: 0.1 + p * 0.4)));
 
       // Import Subtitles
-      final subtitles = <Subtitle>[];
-      for (int i = 0; i < subtitlePaths.length; i++) {
-        final subPath = subtitlePaths[i];
-        final subName = p.basename(subPath);
-        final subDest = p.join(podPath, subName);
-        
-        onUpdate(job.copyWith(
-          currentStep: 'Importing subtitle: $subName',
-          progress: 0.5 + (i / subtitlePaths.length) * 0.2,
-        ));
-
-        await _moveFile(subPath, subDest);
-        subtitles.add(Subtitle(
-          episodeId: -1, // placeholder
-          path: subDest,
-          name: subName,
-        ));
-      }
+      final subtitles = await _importSubtitles(content, Episode.forMovie(contentId: -1, videoPath: '', runtime: 0), subtitlePaths, videoDestPath: destPath, onUpdate: (step, prog) {
+        onUpdate(job.copyWith(currentStep: step, progress: 0.5 + prog * 0.2));
+      });
 
       onUpdate(
         job.copyWith(currentStep: 'Downloading artwork...', progress: 0.7),
@@ -338,52 +312,30 @@ class ImportService {
         for (final epEntry in seasonEntry.value.entries) {
           final epNum = epEntry.key;
           final srcPath = epEntry.value;
-          final destPath = await _storageService.episodeFilePath(
-            content,
-            podPath,
-            season,
-            epNum,
-            srcPath,
-          );
-
-          await _moveFile(
-            srcPath,
-            destPath,
-            onProgress: (p) {
-              if (totalFiles > 0) {
-                onUpdate(
-                  job.copyWith(
-                    currentStep:
-                        'Importing S${season.toString().padLeft(2, '0')}E${epNum.toString().padLeft(2, '0')}...',
-                    progress: 0.1 + ((filesDone + p) / totalFiles) * 0.8,
-                  ),
-                );
-              }
-            },
-          );
-
-          // Import Subtitles for this episode
-          final subtitles = <Subtitle>[];
-          final subPaths = episodeSubtitles[season]?[epNum] ?? [];
-          for (final subPath in subPaths) {
-            final subName = p.basename(subPath);
-            final episodeDir = Directory(destPath).parent.path;
-            final subDest = p.join(episodeDir, subName);
-            await _moveFile(subPath, subDest);
-            subtitles.add(Subtitle(
-              episodeId: -1,
-              path: subDest,
-              name: subName,
-            ));
-          }
-
-          filesDone++;
 
           final existingEp = await _episodeRepo.getSeriesEpisode(
             contentId,
             season,
             epNum,
           );
+
+          final destPath = await _importVideo(content, existingEp ?? Episode.fromTmdbEpisode({}, contentId), srcPath, onProgress: (p) {
+            if (totalFiles > 0) {
+              onUpdate(
+                job.copyWith(
+                  currentStep: 'Importing S${season.toString().padLeft(2, '0')}E${epNum.toString().padLeft(2, '0')} (Video)...',
+                  progress: 0.1 + ((filesDone + p) / totalFiles) * 0.8,
+                ),
+              );
+            }
+          });
+
+          // Import Subtitles for this episode
+          final subPaths = episodeSubtitles[season]?[epNum] ?? [];
+          final subtitles = await _importSubtitles(content, existingEp ?? Episode.fromTmdbEpisode({}, contentId), subPaths, videoDestPath: destPath);
+
+          filesDone++;
+
           if (existingEp != null) {
             await _episodeRepo.update(
               existingEp.copyWith(
@@ -552,59 +504,55 @@ class ImportService {
 
     try {
       final podPath = content.podPath!;
-      final totalFiles = episodeFiles.length + episodeSubtitles.values.fold(0, (sum, subs) => sum + subs.length);
-      int filesDone = 0;
+      
+      // Get union of all episode IDs from both maps
+      final allEpisodeIds = {...episodeFiles.keys, ...episodeSubtitles.keys};
+      final totalItems = episodeFiles.length + episodeSubtitles.values.fold(0, (sum, subs) => sum + subs.length);
+      int itemsDone = 0;
 
-      for (final entry in episodeFiles.entries) {
-        final episodeId = entry.key;
-        final srcPath = entry.value;
-
+      for (final episodeId in allEpisodeIds) {
         final episode = await _episodeRepo.getById(episodeId);
         if (episode == null) continue;
 
-        final destPath = episode.isMovie
-            ? await _storageService.movieFilePath(content, podPath, srcPath)
-            : await _storageService.episodeFilePath(
-                content,
-                podPath,
-                episode.seasonNumber ?? 1,
-                episode.episodeNumber ?? 1,
-                srcPath,
-              );
+        String? finalDestPath = episode.videoPath;
+        final srcVideoPath = episodeFiles[episodeId];
 
-        onUpdate(
-          job.copyWith(
-            currentStep:
-                'Linking S${(episode.seasonNumber ?? 0).toString().padLeft(2, '0')}E${(episode.episodeNumber ?? 0).toString().padLeft(2, '0')}...',
-            progress: (filesDone / totalFiles) * 0.9,
-          ),
-        );
+        // 1. Process Video if provided
+        if (srcVideoPath != null) {
+          finalDestPath = await _importVideo(content, episode, srcVideoPath, onProgress: (p) {
+            onUpdate(
+              job.copyWith(
+                currentStep: 'Linking S${(episode.seasonNumber ?? 0).toString().padLeft(2, '0')}E${(episode.episodeNumber ?? 0).toString().padLeft(2, '0')} (Video)...',
+                progress: (itemsDone / totalItems) * 0.9,
+              ),
+            );
+          });
+          itemsDone++;
+        }
 
-        await _moveFile(srcPath, destPath);
-        
-        // Handle subtitles for this episode (if any)
-        final subtitles = <Subtitle>[];
+        // 2. Process Subtitles if provided
         final subPaths = episodeSubtitles[episodeId] ?? [];
-        for (final subPath in subPaths) {
-          final subName = p.basename(subPath);
-          final episodeDir = Directory(destPath).parent.path;
-          final subDest = p.join(episodeDir, subName);
-          await _moveFile(subPath, subDest);
-          subtitles.add(Subtitle(
-            episodeId: episodeId,
-            path: subDest,
-            name: subName,
-          ));
+        List<Subtitle> subtitles = [];
+        
+        if (subPaths.isNotEmpty) {
+          subtitles = await _importSubtitles(content, episode, subPaths, videoDestPath: finalDestPath, onUpdate: (step, prog) {
+             onUpdate(
+              job.copyWith(
+                currentStep: 'Linking S${(episode.seasonNumber ?? 0).toString().padLeft(2, '0')}E${(episode.episodeNumber ?? 0).toString().padLeft(2, '0')} (Subtitle)...',
+                progress: (itemsDone / totalItems) * 0.9,
+              ),
+            );
+          });
+          itemsDone += subPaths.length;
         }
 
         await _episodeRepo.update(
           episode.copyWith(
-            videoPath: destPath,
-            subtitles: subtitles,
-            fileStatus: FileStatus.ready,
+            videoPath: finalDestPath,
+            subtitles: subtitles.isNotEmpty ? subtitles : episode.subtitles,
+            fileStatus: finalDestPath != null ? FileStatus.ready : episode.fileStatus,
           ),
         );
-        filesDone++;
       }
 
       onUpdate(
@@ -638,48 +586,29 @@ class ImportService {
   Future<void> relinkEpisode({
     required Content content,
     required Episode episode,
-    required String sourceFilePath,
+    String? sourceFilePath,
     List<String> subtitlePaths = const [],
   }) async {
     if (content.podPath == null || episode.id == null) return;
 
     final podPath = content.podPath!;
-    final destPath = episode.isMovie
-        ? await _storageService.movieFilePath(content, podPath, sourceFilePath)
-        : await _storageService.episodeFilePath(
-            content,
-            podPath,
-            episode.seasonNumber!,
-            episode.episodeNumber!,
-            sourceFilePath,
-          );
-
-    await _moveFile(sourceFilePath, destPath);
-
-    // Import and persist subtitles
-    final subtitles = <Subtitle>[];
-    for (final subPath in subtitlePaths) {
-      final subName = p.basename(subPath);
-      final episodeDir = Directory(destPath).parent.path;
-      final subDest = p.join(episodeDir, subName);
-      await _moveFile(subPath, subDest);
-      subtitles.add(Subtitle(
-        episodeId: episode.id!,
-        path: subDest,
-        name: subName,
-      ));
+    String? finalDestPath = episode.videoPath;
+    if (sourceFilePath != null) {
+      finalDestPath = await _importVideo(content, episode, sourceFilePath);
     }
+
+    final subtitles = await _importSubtitles(content, episode, subtitlePaths, videoDestPath: finalDestPath);
 
     final oldPath = episode.videoPath;
     await _episodeRepo.update(
       episode.copyWith(
-        videoPath: destPath,
-        subtitles: subtitles,
-        fileStatus: FileStatus.ready,
+        videoPath: finalDestPath,
+        subtitles: subtitles.isNotEmpty ? subtitles : episode.subtitles,
+        fileStatus: finalDestPath != null ? FileStatus.ready : episode.fileStatus,
       ),
     );
 
-    if (oldPath != null && oldPath != destPath) {
+    if (sourceFilePath != null && oldPath != null && oldPath != finalDestPath) {
       final f = File(oldPath);
       if (await f.exists()) await f.delete();
     }
@@ -746,6 +675,61 @@ class ImportService {
         podPath: content.podPath!,
       );
     }
+  }
+
+  // Helpers for independent video/subtitle processing
+  
+  Future<String> _importVideo(
+    Content content,
+    Episode episode,
+    String srcPath, {
+    void Function(double)? onProgress,
+  }) async {
+    final podPath = content.podPath ?? await _storageService.ensurePodDir(content);
+    final destPath = episode.isMovie
+        ? await _storageService.movieFilePath(content, podPath, srcPath)
+        : await _storageService.episodeFilePath(
+            content,
+            podPath,
+            episode.seasonNumber ?? 1,
+            episode.episodeNumber ?? 1,
+            srcPath,
+          );
+
+    await _moveFile(srcPath, destPath, onProgress: onProgress);
+    return destPath;
+  }
+
+  Future<List<Subtitle>> _importSubtitles(
+    Content content,
+    Episode episode,
+    List<String> srcPaths, {
+    String? videoDestPath,
+    void Function(String step, double progress)? onUpdate,
+  }) async {
+    if (srcPaths.isEmpty) return [];
+
+    final podPath = content.podPath ?? await _storageService.ensurePodDir(content);
+    // Use video location if available, otherwise fallback to pod root
+    final baseDir = videoDestPath != null 
+        ? Directory(videoDestPath).parent.path 
+        : podPath;
+
+    final subtitles = <Subtitle>[];
+    for (int i = 0; i < srcPaths.length; i++) {
+      final src = srcPaths[i];
+      final name = p.basename(src);
+      final dest = p.join(baseDir, name);
+
+      onUpdate?.call('Importing subtitle: $name', i / srcPaths.length);
+      await _moveFile(src, dest);
+      subtitles.add(Subtitle(
+        episodeId: episode.id ?? -1,
+        path: dest,
+        name: name,
+      ));
+    }
+    return subtitles;
   }
 
   Future<void> deleteEpisodesBatch({
@@ -837,21 +821,37 @@ class ImportService {
     final destination = File(dest);
     await destination.parent.create(recursive: true);
 
+    debugPrint('[ImportService] ────── Move Operation ──────');
+    debugPrint('[ImportService] Source: $src');
+    debugPrint('[ImportService] Destination: $dest');
+
+    if (src == dest) {
+      debugPrint('[ImportService] Source and destination are identical, skipping move.');
+      onProgress?.call(1.0);
+      return;
+    }
+
     try {
       // First attempt: Instant rename (zero-copy)
-      if (await destination.exists()) await destination.delete();
+      if (await destination.exists()) {
+        debugPrint('[ImportService] Destination exists, deleting old file...');
+        await destination.delete();
+      }
+      
+      debugPrint('[ImportService] Attempting instant rename...');
       await source.rename(dest);
       onProgress?.call(1.0);
-      debugPrint('[ImportService] File renamed: $src -> $dest');
+      debugPrint('[ImportService] SUCCESS: Instant move (rename) completed.');
       return;
     } catch (e) {
       // If rename fails (e.g. OS Error 18: Cross-device link), fallback to copy.
-      // This is expected when moving from app cache (internal) to vault (external).
+      // This is expected when moving from app cache (internal) to vault (external) 
+      // or across different storage volumes.
       final isCrossDevice =
           e is FileSystemException && e.osError?.errorCode == 18;
-      debugPrint(
-        '[ImportService] Rename failed (${isCrossDevice ? 'cross-device' : 'unexpected'}), falling back to copy: $e',
-      );
+      
+      debugPrint('[ImportService] Rename failed: ${isCrossDevice ? "Cross-device move" : e.toString()}');
+      debugPrint('[ImportService] Falling back to streaming copy...');
     }
 
     // Fallback: Copy and then delete source
@@ -859,22 +859,25 @@ class ImportService {
     await _copyWithProgress(source, destination, onProgress);
 
     // Cleanup source if it's from a temporary/cache location
+    // or if we resolved it from a content URI (it might still be a cache path if resolution failed)
     final isCacheFile =
         src.contains('/cache/') ||
         src.contains('/tmp/') ||
         src.contains('com.android.providers.downloads.documents') ||
         src.contains(
           'content://',
-        ); // Android content URIs are usually transient
+        );
 
     if (isCacheFile) {
       try {
         await source.delete();
-        debugPrint('[ImportService] Source cache file deleted: $src');
+        debugPrint('[ImportService] Source cache file cleaned up: $src');
       } catch (e) {
-        debugPrint('[ImportService] Could not delete source cache file: $e');
+        debugPrint('[ImportService] Warning: Could not delete source cache file: $e');
       }
     }
+    
+    debugPrint('[ImportService] SUCCESS: Streaming copy completed.');
   }
 
   Future<void> _copyWithProgress(

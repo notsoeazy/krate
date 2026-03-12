@@ -169,7 +169,7 @@ class ManagedEpisodeTile extends StatelessWidget {
           const SizedBox(width: 4),
           Expanded(
             child: Text(
-              '${stagedFile!.path.split('/').last}${isReplace ? ' (Replace)' : ''}',
+              '${stagedFile!.path?.split('/').last ?? 'Subtitle Update'}${isReplace ? ' (Replace)' : ''}',
               style: theme.textTheme.labelSmall?.copyWith(
                 color: isReplace
                     ? theme.colorScheme.secondary
