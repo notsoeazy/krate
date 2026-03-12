@@ -24,6 +24,13 @@ class _RecentsScreenState extends ConsumerState<RecentsScreen>
       vsync: this,
       initialIndex: initialTab,
     );
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        if (ref.read(recentsTabProvider) != _tabController.index) {
+          ref.read(recentsTabProvider.notifier).state = _tabController.index;
+        }
+      }
+    });
   }
 
   @override

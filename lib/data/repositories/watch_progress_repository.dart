@@ -50,11 +50,12 @@ class WatchProgressRepository {
     final db = await _db.database;
     final rows = await db.rawQuery(
       '''
-      SELECT DISTINCT c.*
+      SELECT c.*
       FROM watch_progress wp
       JOIN content c ON c.id = wp.contentId
       WHERE wp.positionMs > 0
-      ORDER BY wp.lastWatchedAt DESC
+      GROUP BY c.id
+      ORDER BY MAX(wp.lastWatchedAt) DESC
       LIMIT ?
       ''',
       [limit],

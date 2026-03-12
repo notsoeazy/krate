@@ -26,6 +26,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       vsync: this,
       initialIndex: initialTab,
     );
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        if (ref.read(libraryTabProvider) != _tabController.index) {
+          ref.read(libraryTabProvider.notifier).state = _tabController.index;
+        }
+      }
+    });
   }
 
   @override
