@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:krate/utils/constants.dart';
 import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/widgets/content_grid.dart';
 
@@ -42,7 +41,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     super.dispose();
   }
 
-  /// Invalidates all content list providers so both tabs and Home cards refresh.
+  // Invalidates all content list providers so both tabs and Home cards refresh.
   Future<void> _refresh() async {
     ref.invalidate(moviesProvider);
     ref.invalidate(seriesProvider);
@@ -58,7 +57,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
   @override
   Widget build(BuildContext context) {
-    // React to Home "See All" taps even when mounted in IndexedStack
+    // React to Home "See All"
     ref.listen<int>(libraryTabProvider, (_, next) {
       if (_tabController.index != next) _tabController.animateTo(next);
     });
@@ -119,15 +118,19 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         controller: _tabController,
         children: [
           ContentGrid(
-            type: ContentType.movie,
+            asyncData: ref.watch(moviesProvider),
             query: _searchQuery,
             onRefresh: _refresh,
+            emptyMessage: 'Your movie vault is empty',
+            emptyIcon: Icons.movie_outlined,
             showType: false,
           ),
           ContentGrid(
-            type: ContentType.series,
+            asyncData: ref.watch(seriesProvider),
             query: _searchQuery,
             onRefresh: _refresh,
+            emptyMessage: 'Your series vault is empty',
+            emptyIcon: Icons.tv_outlined,
             showType: false,
           ),
         ],

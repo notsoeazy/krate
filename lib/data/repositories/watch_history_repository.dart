@@ -56,16 +56,23 @@ class WatchHistoryRepository {
     );
   }
 
-  /// Returns the list of content IDs that have been fully watched
+  /// Returns the list of content IDs that have been fully watched (all episodes finished)
   Future<List<int>> getCompletedContentIds() async {
     final db = await _db.database;
+    // A content is completed if ALL its episodes have isFinished = 1 in watch_progress.
+    // We join content with episodes and left join with watch_progress.
+    // If the count of episodes matches the count of finished progress entries, it's completed.
     final rows = await db.rawQuery('''
-      SELECT contentId FROM watch_progress
-      WHERE isFinished = 1
-      GROUP BY contentId
-      ORDER BY MAX(lastWatchedAt) DESC
+      SELECT c.id
+      FROM content c
+      JOIN episodes e ON e.contentId = c.id
+      LEFT JOIN watch_progress wp ON wp.episodeId = e.id
+      GROUP BY c.id
+      HAVING COUNT(e.id) > 0 
+         AND COUNT(CASE WHEN wp.isFinished = 1 THEN 1 END) = COUNT(e.id)
+      ORDER BY MAX(wp.lastWatchedAt) DESC
       ''');
-    return rows.map((r) => r['contentId'] as int).toList();
+    return rows.map((r) => r['id'] as int).toList();
   }
 
   Future<void> clearAll() async {

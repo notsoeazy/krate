@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/providers/providers.dart';
-import 'package:krate/ui/screens/library/media_details_screen.dart';
 import 'package:krate/ui/screens/import/media_details_import_screen.dart';
+import 'package:krate/ui/screens/media_details/media_details_screen.dart';
 import 'package:krate/utils/constants.dart';
 
 class SearchResultTile extends ConsumerWidget {
@@ -53,8 +53,10 @@ class SearchResultTile extends ConsumerWidget {
               return Padding(
                 padding: const EdgeInsets.only(left: 8),
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(4),
@@ -70,7 +72,7 @@ class SearchResultTile extends ConsumerWidget {
               );
             },
             loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
+            error: (e, st) => const SizedBox.shrink(),
           ),
         ],
       ),

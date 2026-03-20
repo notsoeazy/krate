@@ -1,5 +1,12 @@
 # Krate - Project Roadmap & Tasks
 
+## ⚡ Current Priorities
+
+1.  **Import Rework**: Auto-search by filename and dedicated import screen.
+2.  **Mark as Complete**: Manually toggle "watched" status for episodes/movies.
+3.  **Handle Missing but Completed**: Graceful handling/badges for watched items whose files were deleted.
+4.  **Delete Media**: Implementation of full pod and granular file deletion.
+
 ## Phase 1: Core Localization & Stabilization 🛠️
 
 _Goal: Ensure the library is robust, portable, and correctly captures all metadata._
@@ -21,8 +28,9 @@ _Goal: Improve usability and make playback feel seamless._
 - [ ] **Player Screen Lock**: Prevent accidental touches during playback.
 - [ ] **Series Navigation**: "Next Episode" and "Previous Episode" buttons in player.
 - [ ] **Auto-Play**: Automatically start the next episode.
+- [ ] **Mark as Complete**: Manually toggle the "watched" status without playing the file.
 - [ ] **Continue Watching Redesign**: Improved logic and UI for resuming content.
-- [ ] **Search Library**: Quickly find content within the Library tab.
+- [x] **Search Library**: Quickly find content within the Library tab.
 
 ## Phase 3: Advanced Features & Polish ✨
 
@@ -32,8 +40,9 @@ _Goal: Add power-user features and final UI consistency._
 - [ ] **Settings Menu**: Root directory selection, theming, and cache management.
 - [ ] **Watch Statistics**: Total watch time and content counters.
 - [ ] **Granular Storage**: Delete video files only while keeping metadata entries.
-- [ ] **Backup & Restore**: Export library data to a portable archive.
-- [ ] **UI Consistency**: Final polish to ensure all screens follow `ui-design.md`.
+- [ ] **JSON Backup & Export**: Export library data to a portable JSON archive for backup.
+- [ ] **Reworked Import Screen**: Dedicated screen for importing media, accessible via FAB, Settings, or Top Bar.
+- [ ] **Auto-Search Import**: Rework the import flow to automatically search based on filename for matching metadata.
 - [ ] **External Player**: Option to open files in VLC/MX Player.
 - [ ] **Custom Collections**: User-defined playlists/groups.
 
@@ -43,7 +52,7 @@ _Goal: Bringing Krate to the Desktop._
 
 - [ ] **Linux Support**: Porting storage and file pickers for desktop environments.
 - [ ] **Windows Support**: Ensuring compatibility with Windows file systems and pickers.
-- [ ] **Adaptive UI**: Refined layouts for large screens and mouse input.
+- [x] **Adaptive UI**: Refined layouts for large screens (NavigationRail and ContentGrid adaptive columns).
 
 ## Completed ✅
 

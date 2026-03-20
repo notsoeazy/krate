@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/providers/providers.dart';
-import 'package:krate/ui/widgets/recents_history_view.dart';
-import 'package:krate/ui/widgets/recents_content_grid.dart';
+import 'package:krate/ui/screens/recents/components/recents_history_tab.dart';
+import 'package:krate/ui/screens/recents/components/recents_watching_tab.dart';
+import 'package:krate/ui/screens/recents/components/recents_completed_tab.dart';
 
 class RecentsScreen extends ConsumerStatefulWidget {
   const RecentsScreen({super.key});
@@ -51,12 +52,12 @@ class _RecentsScreenState extends ConsumerState<RecentsScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Recents'),
-        // Tabs
+        // Tabs: History, Watching, Completed
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
             Tab(text: 'History'),
-            Tab(text: 'Added'),
+            Tab(text: 'Watching'),
             Tab(text: 'Completed'),
           ],
         ),
@@ -64,33 +65,10 @@ class _RecentsScreenState extends ConsumerState<RecentsScreen>
       // Tab Views
       body: TabBarView(
         controller: _tabController,
-        children: [
-          // History View
-          const RecentsHistoryView(),
-          // Added View
-          Consumer(
-            builder: (context, ref, _) {
-              final addedAsync = ref.watch(recentlyAddedAllProvider);
-              return RecentsContentGrid(
-                asyncData: addedAsync,
-                emptyMessage: 'No recently added items',
-                emptyIcon: Icons.new_releases_outlined,
-                onRefresh: () async => ref.invalidate(recentlyAddedAllProvider),
-              );
-            },
-          ),
-          // Completed View
-          Consumer(
-            builder: (context, ref, _) {
-              final completedAsync = ref.watch(completedContentProvider);
-              return RecentsContentGrid(
-                asyncData: completedAsync,
-                emptyMessage: 'No completed items',
-                emptyIcon: Icons.task_alt,
-                onRefresh: () async => ref.invalidate(completedContentProvider),
-              );
-            },
-          ),
+        children: const [
+          RecentsHistoryTab(),
+          RecentsWatchingTab(),
+          RecentsCompletedTab(),
         ],
       ),
     );

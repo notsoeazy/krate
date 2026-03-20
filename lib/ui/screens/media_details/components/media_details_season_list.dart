@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/screens/player/player_screen.dart';
-import 'package:krate/ui/widgets/episode_tile.dart';
+import 'package:krate/ui/screens/media_details/components/media_details_episode_tile.dart';
 
-class SeasonEpisodeList extends ConsumerWidget {
+class MediaDetailsSeasonList extends ConsumerWidget {
   final int contentId;
   final int seasonNumber;
 
-  const SeasonEpisodeList({
+  const MediaDetailsSeasonList({
     super.key,
     required this.contentId,
     required this.seasonNumber,
@@ -42,7 +42,7 @@ class SeasonEpisodeList extends ConsumerWidget {
           separatorBuilder: (_, _) => const Divider(height: 1, indent: 72),
           itemBuilder: (context, index) {
             final ep = eps[index];
-            return EpisodeTile(
+            return MediaDetailsEpisodeTile(
               episode: ep,
               onPlay: () {
                 if (ep.id != null) {

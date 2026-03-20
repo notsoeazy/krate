@@ -5,7 +5,7 @@ import 'package:krate/ui/screens/home/home_screen.dart';
 import 'package:krate/ui/screens/library/library_screen.dart';
 import 'package:krate/ui/screens/recents/recents_screen.dart';
 import 'package:krate/ui/screens/settings/settings_screen.dart';
-import 'package:krate/ui/widgets/import_overlay.dart';
+import 'package:krate/ui/screens/import/components/import_overlay.dart';
 
 class ShellScreen extends ConsumerWidget {
   const ShellScreen({super.key});
@@ -21,38 +21,92 @@ class ShellScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currentIndex = ref.watch(shellTabIndexProvider);
 
-    return Scaffold(
-      body: ImportOverlay(
-        child: IndexedStack(index: currentIndex, children: _screens),
+    final destinations = [
+      const _NavigationDestinationData(
+        icon: Icons.home_outlined,
+        selectedIcon: Icons.home,
+        label: 'Home',
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: currentIndex,
-        onDestinationSelected: (index) {
-          ref.read(shellTabIndexProvider.notifier).state = index;
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.movie_outlined),
-            selectedIcon: Icon(Icons.movie),
-            label: 'Library',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.history_outlined),
-            selectedIcon: Icon(Icons.history),
-            label: 'Recents',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Settings',
-          ),
-        ],
+      const _NavigationDestinationData(
+        icon: Icons.movie_outlined,
+        selectedIcon: Icons.movie,
+        label: 'Library',
       ),
+      const _NavigationDestinationData(
+        icon: Icons.history_outlined,
+        selectedIcon: Icons.history,
+        label: 'Recents',
+      ),
+      const _NavigationDestinationData(
+        icon: Icons.settings_outlined,
+        selectedIcon: Icons.settings,
+        label: 'Settings',
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 600;
+
+        return Scaffold(
+          body: Row(
+            children: [
+              if (isWide)
+                NavigationRail(
+                  selectedIndex: currentIndex,
+                  groupAlignment: 0.0,
+                  onDestinationSelected: (index) {
+                    ref.read(shellTabIndexProvider.notifier).state = index;
+                  },
+                  labelType: NavigationRailLabelType.all,
+                  destinations: destinations
+                      .map(
+                        (d) => NavigationRailDestination(
+                          icon: Icon(d.icon),
+                          selectedIcon: Icon(d.selectedIcon),
+                          label: Text(d.label),
+                        ),
+                      )
+                      .toList(),
+                ),
+              Expanded(
+                child: ImportOverlay(
+                  child: IndexedStack(index: currentIndex, children: _screens),
+                ),
+              ),
+            ],
+          ),
+          bottomNavigationBar: isWide
+              ? null
+              : NavigationBar(
+                  selectedIndex: currentIndex,
+                  onDestinationSelected: (index) {
+                    ref.read(shellTabIndexProvider.notifier).state = index;
+                  },
+                  destinations: destinations
+                      .map(
+                        (d) => NavigationDestination(
+                          icon: Icon(d.icon),
+                          selectedIcon: Icon(d.selectedIcon),
+                          label: d.label,
+                        ),
+                      )
+                      .toList(),
+                ),
+        );
+      },
     );
   }
+}
+
+class _NavigationDestinationData {
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+
+  const _NavigationDestinationData({
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+  });
 }

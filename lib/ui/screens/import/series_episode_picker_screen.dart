@@ -5,7 +5,7 @@ import 'package:krate/data/models/episode.dart';
 import 'package:krate/utils/errors.dart';
 import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/widgets/busy_overlay.dart';
-import 'package:krate/ui/widgets/managed_episode_tile.dart';
+import 'package:krate/ui/screens/media_details/components/media_management_episode_tile.dart';
 import 'package:krate/utils/file_utils.dart';
 
 class SeriesEpisodePickerScreen extends ConsumerStatefulWidget {
@@ -129,9 +129,9 @@ class _SeriesEpisodePickerScreenState
       }
     } on KrateException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
       }
     } catch (e) {
       if (mounted) {
@@ -174,7 +174,7 @@ class _SeriesEpisodePickerScreenState
         final season = int.parse(match.group(1)!);
         final ep = int.parse(match.group(2)!);
         mappedFiles.putIfAbsent(season, () => {})[ep] = entry.value;
-        
+
         final subs = _selectedSubtitles[entry.key];
         if (subs != null && subs.isNotEmpty) {
           mappedSubtitles.putIfAbsent(season, () => {})[ep] = subs;
@@ -240,7 +240,6 @@ class _SeriesEpisodePickerScreenState
                   'Season $seasonNum',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
-                // M3 compliant: no Theme.copyWith hack needed
                 shape: const Border(),
                 collapsedShape: const Border(),
                 initiallyExpanded: index == 0,
@@ -249,7 +248,7 @@ class _SeriesEpisodePickerScreenState
                   final key = 'S${seasonNum}E$epNum';
                   final filePath = _selectedFiles[key];
 
-                  return ManagedEpisodeTile(
+                  return MediaManagementEpisodeTile(
                     episode: Episode(
                       contentId: _content!.id ?? -1,
                       seasonNumber: seasonNum,
@@ -269,7 +268,8 @@ class _SeriesEpisodePickerScreenState
                           )
                         : null,
                     onImport: () => _pickFilesSingle(seasonNum, epNum),
-                    onAddSubtitles: () => _pickAdditionalSubtitlesSingle(seasonNum, epNum),
+                    onAddSubtitles: () =>
+                        _pickAdditionalSubtitlesSingle(seasonNum, epNum),
                     onRemoveFile: () => setState(() {
                       _selectedFiles.remove(key);
                       _selectedSubtitles.remove(key);

@@ -28,6 +28,7 @@ class StorageService {
       '$path/.krate_permission_test_${DateTime.now().millisecondsSinceEpoch}',
     );
     try {
+      // For testing only for errors
       await testFile.writeAsString('ok');
       await testFile.delete();
     } catch (_) {

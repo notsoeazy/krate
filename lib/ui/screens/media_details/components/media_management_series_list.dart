@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:krate/data/models/episode.dart';
 import 'package:krate/providers/providers.dart';
-import 'package:krate/ui/widgets/managed_episode_tile.dart';
+import 'package:krate/ui/screens/media_details/components/media_management_episode_tile.dart';
 
 class MediaManagementSeriesList extends StatelessWidget {
   final List<Episode> episodes;
@@ -49,7 +49,7 @@ class MediaManagementSeriesList extends StatelessWidget {
           collapsedShape: const Border(),
           initiallyExpanded: index == 0,
           children: seasonEpisodes.map((ep) {
-            return ManagedEpisodeTile(
+            return MediaManagementEpisodeTile(
               episode: ep,
               mode: state.isDeleteMode
                   ? ManagedTileMode.delete

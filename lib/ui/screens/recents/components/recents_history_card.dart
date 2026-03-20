@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:krate/ui/widgets/unavailable_overlay.dart';
 
-class RecentMediaCard extends StatelessWidget {
+class RecentsHistoryCard extends StatelessWidget {
   final String title;
   final String? subtitle;
   final String? tagText;
@@ -11,7 +11,7 @@ class RecentMediaCard extends StatelessWidget {
   final bool isUnavailable;
   final VoidCallback onTap;
 
-  const RecentMediaCard({
+  const RecentsHistoryCard({
     super.key,
     required this.title,
     this.subtitle,
@@ -39,21 +39,28 @@ class RecentMediaCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Poster
-                SizedBox(
-                  width: 84, // Slightly wider for 2:3 ratio against 120 height approx
-                  child: UnavailableOverlay(
-                    isUnavailable: isUnavailable,
-                    borderRadius: 0,
-                    child: localPosterPath != null && File(localPosterPath!).existsSync()
-                        ? Image.file(
-                            File(localPosterPath!),
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => _buildPlaceholderIcon(),
-                          )
-                        : _buildPlaceholderIcon(),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox(
+                    width:
+                        84, // Slightly wider for 2:3 ratio against 120 height approx
+                    child: UnavailableOverlay(
+                      isUnavailable: isUnavailable,
+                      borderRadius: 0,
+                      child:
+                          localPosterPath != null &&
+                              File(localPosterPath!).existsSync()
+                          ? Image.file(
+                              File(localPosterPath!),
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  _buildPlaceholderIcon(),
+                            )
+                          : _buildPlaceholderIcon(),
+                    ),
                   ),
                 ),
-                
+
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.all(12),
@@ -85,7 +92,10 @@ class RecentMediaCard extends StatelessWidget {
                           const SizedBox(height: 4),
                           // Metadata Badge
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: theme.colorScheme.secondaryContainer,
                               borderRadius: BorderRadius.circular(4),

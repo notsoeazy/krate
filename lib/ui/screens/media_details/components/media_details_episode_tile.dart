@@ -3,12 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/data/models/episode.dart';
 import 'package:krate/providers/providers.dart';
 
-class EpisodeTile extends ConsumerWidget {
+class MediaDetailsEpisodeTile extends ConsumerWidget {
   final Episode episode;
   final VoidCallback onPlay;
   final bool isCurrentlyPlaying;
 
-  const EpisodeTile({
+  const MediaDetailsEpisodeTile({
     super.key,
     required this.episode,
     required this.onPlay,

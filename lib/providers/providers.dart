@@ -23,12 +23,13 @@ import 'package:krate/services/watch_progress_service.dart';
 import 'package:krate/utils/file_utils.dart';
 
 // UI State Providers
+// Which tab the Library screen should show: 0 = Home, 1 = Library, 2 = Recents, 3 = Settings.
 final shellTabIndexProvider = StateProvider<int>((ref) => 0);
 
 // Which tab the Library screen should show: 0 = Movies, 1 = Series.
 final libraryTabProvider = StateProvider<int>((ref) => 0);
 
-// Which tab the Recents screen should show: 0 = History, 1 = Added, 2 = Completed.
+// Which tab the Recents screen should show: 0 = History, 1 = Watching, 2 = Completed.
 final recentsTabProvider = StateProvider<int>((ref) => 0);
 
 // Infrastructure singletons
@@ -134,7 +135,7 @@ class ImportJobsNotifier extends StateNotifier<List<ImportJob>> {
     _ref.invalidate(recentMoviesProvider);
     _ref.invalidate(recentSeriesProvider);
     _ref.invalidate(watchHistoryListProvider);
-    _ref.invalidate(recentlyAddedAllProvider);
+    _ref.invalidate(watchingContentProvider);
     _ref.invalidate(completedContentProvider);
   }
 
@@ -392,13 +393,16 @@ final recentSeriesProvider = FutureProvider.autoDispose<List<Content>>((ref) {
 final continueWatchingProvider = FutureProvider.autoDispose<List<Content>>((
   ref,
 ) async {
-  final contentList =
-      await ref.read(watchProgressRepoProvider).getInProgressContent(limit: 10);
+  final contentList = await ref
+      .read(watchProgressRepoProvider)
+      .getInProgressContent(limit: 10);
 
   // Filter out content that is fully completed (no resume episode)
   final results = await Future.wait(
     contentList.map((c) async {
-      final resumeEpisode = await ref.watch(resumeEpisodeProvider(c.id!).future);
+      final resumeEpisode = await ref.watch(
+        resumeEpisodeProvider(c.id!).future,
+      );
       return resumeEpisode != null ? c : null;
     }),
   );
@@ -411,10 +415,25 @@ final watchHistoryListProvider =
       return ref.read(watchHistoryRepoProvider).getAll(limit: 50);
     });
 
-final recentlyAddedAllProvider = FutureProvider.autoDispose<List<Content>>((
+final watchingContentProvider = FutureProvider.autoDispose<List<Content>>((
   ref,
-) {
-  return ref.read(contentRepoProvider).getRecentlyAdded(limit: 50);
+) async {
+  // Reuse logic from continueWatchingProvider but without the limit of 10
+  final contentList = await ref
+      .read(watchProgressRepoProvider)
+      .getInProgressContent(limit: 50);
+
+  // Filter out content that is fully completed (no resume episode)
+  final results = await Future.wait(
+    contentList.map((c) async {
+      final resumeEpisode = await ref.watch(
+        resumeEpisodeProvider(c.id!).future,
+      );
+      return resumeEpisode != null ? c : null;
+    }),
+  );
+
+  return results.whereType<Content>().toList();
 });
 
 final completedContentProvider = FutureProvider.autoDispose<List<Content>>((
@@ -439,8 +458,8 @@ final contentProvider = FutureProvider.family.autoDispose<Content?, int>((
 });
 
 /// Watches a specific content item by its TMDB ID.
-final contentByTmdbIdProvider =
-    FutureProvider.family.autoDispose<Content?, int>((ref, tmdbId) {
+final contentByTmdbIdProvider = FutureProvider.family
+    .autoDispose<Content?, int>((ref, tmdbId) {
       return ref.read(contentRepoProvider).getByTmdbId(tmdbId);
     });
 
@@ -611,7 +630,6 @@ class MediaManagementNotifier extends StateNotifier<MediaManagementState> {
       state = state.copyWith(isPickerOpen: false);
     }
   }
-
 
   Future<void> pickSubtitles({
     required int episodeId,

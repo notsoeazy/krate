@@ -20,7 +20,6 @@ class KrateApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final vaultStatus = ref.watch(vaultStatusProvider);
 
-    // Build the text theme using font constants — Inter for both body and display.
     final textTheme = createTextTheme(context, kBodyFont, kDisplayFont);
     final materialTheme = MaterialTheme(textTheme);
 

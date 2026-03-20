@@ -83,6 +83,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       );
     }
 
+    // Pre-fetch home screen data
+    ref.read(continueWatchingProvider.future);
+    ref.read(recentMoviesProvider.future);
+    ref.read(recentSeriesProvider.future);
+
     final elapsed = DateTime.now().difference(startTime);
     final remaining = const Duration(milliseconds: 2000) - elapsed;
     if (remaining.inMilliseconds > 0) {
@@ -125,7 +130,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               Image.asset(
-                'assets/krate-icon_transparent.png',
+                'assets/krate-icon_transparent-big.png',
                 width: 120,
                 height: 120,
               ),

@@ -49,6 +49,7 @@ The vault lives inside a user-selected root folder (persisted via `SharedPrefere
 ```
 
 Pod folder naming is handled by `StorageService.ensurePodDir()`:
+
 - Pattern: `slugified-title_year_tmdbId`
 - Episode files: `slugified-title_S01E01.ext` inside `Season_NN/` subdirectories
 
@@ -59,6 +60,7 @@ Pod folder naming is handled by `StorageService.ensurePodDir()`:
 Written (or overwritten) by `MetadataService.scribe()` after every import, link, re-link, delete, or rescan operation. It captures the full state of the pod.
 
 **Schema (movies):**
+
 ```json
 {
   "version": 1,
@@ -85,6 +87,7 @@ Written (or overwritten) by `MetadataService.scribe()` after every import, link,
 ```
 
 **Schema (series)** — same header fields, plus:
+
 ```json
 {
   "totalSeasons": 3,
@@ -115,71 +118,76 @@ Written (or overwritten) by `MetadataService.scribe()` after every import, link,
 Stored in the OS app-data directory (`getDatabasesPath()`). Acts as a **read cache** — the filesystem is authoritative.
 
 ### `content` table
-| Column | Type | Notes |
-|---|---|---|
-| `id` | INTEGER PK | Auto-incremented local ID |
-| `tmdbId` | INTEGER UNIQUE | TMDB identifier, used to look up and de-duplicate |
-| `contentType` | TEXT | `'movie'` or `'series'` |
-| `title` | TEXT | |
-| `genres` | TEXT | JSON-encoded string array |
-| `releaseDate` | TEXT | ISO 8601 |
-| `runtime` | INTEGER | Minutes. For series: average episode runtime |
-| `totalSeasons` | INTEGER | Series only |
-| `totalEpisodes` | INTEGER | Series only |
-| `tmdbPosterPath` | TEXT | Remote TMDB path, kept for re-download |
-| `tmdbBackdropPath` | TEXT | Remote TMDB path |
-| `localPosterPath` | TEXT | Absolute path to `poster.jpg` in pod |
-| `localBackdropPath` | TEXT | Absolute path to `backdrop.jpg` in pod |
-| `podPath` | TEXT | Absolute path to the pod directory |
-| `isFavorite` | INTEGER | 0 or 1 |
-| `fileStatus` | TEXT | `'ready'` or `'missing'` |
+
+| Column              | Type           | Notes                                             |
+| ------------------- | -------------- | ------------------------------------------------- |
+| `id`                | INTEGER PK     | Auto-incremented local ID                         |
+| `tmdbId`            | INTEGER UNIQUE | TMDB identifier, used to look up and de-duplicate |
+| `contentType`       | TEXT           | `'movie'` or `'series'`                           |
+| `title`             | TEXT           |                                                   |
+| `genres`            | TEXT           | JSON-encoded string array                         |
+| `releaseDate`       | TEXT           | ISO 8601                                          |
+| `runtime`           | INTEGER        | Minutes. For series: average episode runtime      |
+| `totalSeasons`      | INTEGER        | Series only                                       |
+| `totalEpisodes`     | INTEGER        | Series only                                       |
+| `tmdbPosterPath`    | TEXT           | Remote TMDB path, kept for re-download            |
+| `tmdbBackdropPath`  | TEXT           | Remote TMDB path                                  |
+| `localPosterPath`   | TEXT           | Absolute path to `poster.jpg` in pod              |
+| `localBackdropPath` | TEXT           | Absolute path to `backdrop.jpg` in pod            |
+| `podPath`           | TEXT           | Absolute path to the pod directory                |
+| `isFavorite`        | INTEGER        | 0 or 1                                            |
+| `fileStatus`        | TEXT           | `'ready'` or `'missing'`                          |
 
 ### `episodes` table
-| Column | Type | Notes |
-|---|---|---|
-| `id` | INTEGER PK | |
-| `contentId` | INTEGER FK | References `content(id)` with CASCADE delete |
-| `seasonNumber` | INTEGER | `NULL` for movies |
-| `episodeNumber` | INTEGER | `NULL` for movies |
-| `title` | TEXT | Episode name from TMDB |
-| `runtime` | INTEGER | Minutes |
-| `videoPath` | TEXT | Absolute path to video file on disk |
-| `fileStatus` | TEXT | `'ready'` or `'missing'` |
+
+| Column          | Type       | Notes                                        |
+| --------------- | ---------- | -------------------------------------------- |
+| `id`            | INTEGER PK |                                              |
+| `contentId`     | INTEGER FK | References `content(id)` with CASCADE delete |
+| `seasonNumber`  | INTEGER    | `NULL` for movies                            |
+| `episodeNumber` | INTEGER    | `NULL` for movies                            |
+| `title`         | TEXT       | Episode name from TMDB                       |
+| `runtime`       | INTEGER    | Minutes                                      |
+| `videoPath`     | TEXT       | Absolute path to video file on disk          |
+| `fileStatus`    | TEXT       | `'ready'` or `'missing'`                     |
 
 ### `subtitles` table
+
 Managed by `SubtitleRepository`. One episode can have multiple subtitle files.
 
-| Column | Type | Notes |
-|---|---|---|
-| `id` | INTEGER PK | |
-| `episodeId` | INTEGER FK | References `episodes(id)` with CASCADE delete |
-| `path` | TEXT | Absolute path to the subtitle file (`.vtt`, `.srt`, `.ass`) |
-| `name` | TEXT | Display name (usually the filename) |
+| Column      | Type       | Notes                                                       |
+| ----------- | ---------- | ----------------------------------------------------------- |
+| `id`        | INTEGER PK |                                                             |
+| `episodeId` | INTEGER FK | References `episodes(id)` with CASCADE delete               |
+| `path`      | TEXT       | Absolute path to the subtitle file (`.vtt`, `.srt`, `.ass`) |
+| `name`      | TEXT       | Display name (usually the filename)                         |
 
 > Movies get a single episode row with `seasonNumber = NULL`, `episodeNumber = NULL`. This unifies playback logic across both content types.
 
 ### `watch_progress` table
+
 One row per episode. Upserted every time the player saves position.
 
-| Column | Type | Notes |
-|---|---|---|
-| `episodeId` | INTEGER UNIQUE FK | |
-| `contentId` | INTEGER FK | Denormalized for fast `getInProgress` queries |
-| `positionMs` | INTEGER | Playback position in milliseconds |
-| `durationMs` | INTEGER | Total duration in milliseconds |
-| `isFinished` | INTEGER | 1 if position ≥ 90% of duration |
-| `lastWatchedAt` | TEXT | ISO 8601, used for "Continue Watching" ordering |
+| Column          | Type              | Notes                                           |
+| --------------- | ----------------- | ----------------------------------------------- |
+| `episodeId`     | INTEGER UNIQUE FK |                                                 |
+| `contentId`     | INTEGER FK        | Denormalized for fast `getInProgress` queries   |
+| `positionMs`    | INTEGER           | Playback position in milliseconds               |
+| `durationMs`    | INTEGER           | Total duration in milliseconds                  |
+| `isFinished`    | INTEGER           | 1 if position ≥ 90% of duration                 |
+| `lastWatchedAt` | TEXT              | ISO 8601, used for "Continue Watching" ordering |
 
 ### `watch_history` table
+
 Append-only log. One row inserted per viewing session when the player closes.
 
-| Column | Type | Notes |
-|---|---|---|
-| `contentId` | INTEGER FK | |
-| `episodeId` | INTEGER FK | |
-| `startedAt` | TEXT | Session start time |
-| `finishedAt` | TEXT | Session end time |
-| `durationWatchedMs` | INTEGER | Total milliseconds watched in that session |
+| Column              | Type       | Notes                                      |
+| ------------------- | ---------- | ------------------------------------------ |
+| `contentId`         | INTEGER FK |                                            |
+| `episodeId`         | INTEGER FK |                                            |
+| `startedAt`         | TEXT       | Session start time                         |
+| `finishedAt`        | TEXT       | Session end time                           |
+| `durationWatchedMs` | INTEGER    | Total milliseconds watched in that session |
 
 ---
 
@@ -202,10 +210,10 @@ The import pipeline is split into two explicit phases — **Scouting** (requires
 
 **Screens:** `MediaDetailsImportScreen`
 
-1. User taps **"Pick Media"** or **"Pick Subtitles"** on `MediaDetailsImportScreen`. 
-2. `FileUtils.pickFiles()` is called. 
-    - **On Android**: Uses a `MethodChannel` to trigger a native intent. This bypasses the default `file_picker` caching mechanism, returning direct UIDs/Paths and improving performance for massive 4GB+ files.
-    - **Other Platforms**: Falls back to the community `file_picker` plugin.
+1. User taps **"Pick Media"** or **"Pick Subtitles"** on `MediaDetailsImportScreen`.
+2. `FileUtils.pickFiles()` is called.
+   - **On Android**: Uses a `MethodChannel` to trigger a native intent. This bypasses the default `file_picker` caching mechanism, returning direct UIDs/Paths and improving performance for massive 4GB+ files.
+   - **Other Platforms**: Falls back to the community `file_picker` plugin.
 3. The selected files are displayed in the staging area. Subtitles can be selected independently of the video file.
 4. User taps **"Import Movie"**. The screen calls `ImportJobsNotifier.importMovie()`, which runs `ImportService.scoutMovie()` as a non-blocking background job.
 5. The screen immediately pops back to Home (`Navigator.popUntil(isFirst)`).
@@ -288,6 +296,7 @@ After a series is already scouted (metadata exists, artwork downloaded), the use
 ```
 
 **Re-linking a single episode** (`ImportService.relinkEpisode()`):
+
 - Moves the new file into the vault at the same target path.
 - Updates the episode's `videoPath` in the DB.
 - Deletes the old file if the path changed.
@@ -298,20 +307,26 @@ After a series is already scouted (metadata exists, artwork downloaded), the use
 ## Deletion Flow
 
 ### Delete a Content Entry (entire movie or series)
+
 `ImportService.deleteContent(content, deleteFiles: bool)`:
+
 - If `deleteFiles = true`: deletes the entire pod directory recursively.
 - Calls `ContentRepository.delete(contentId)`.
 - Due to `ON DELETE CASCADE` in the DB schema, all related `episodes`, `watch_progress`, and `watch_history` rows are automatically removed.
 
 ### Delete a Single Episode File
+
 `ImportService.deleteEpisodeFile(content, episode)`:
+
 1. Deletes the physical file from disk (if it exists).
 2. `EpisodeRepository.update()` — sets `videoPath = null`, `fileStatus = 'missing'`.
 3. `_syncContentStatus()` — re-evaluates Content's `fileStatus`.
 4. `MetadataService.scribe()` — rewrites `.metadata.json` with updated state.
 
 ### Batch Delete Episode Files
+
 `ImportService.deleteEpisodesBatch(content, episodes)`:
+
 - Iterates the episode list, deleting each file and clearing each DB row.
 - One final `_syncContentStatus()` + `MetadataService.scribe()` call after all deletions.
 
@@ -344,6 +359,7 @@ Triggered manually by the user (e.g., a "Sync Vault" action). Used to reconcile 
 **Screen:** `PlayerScreen` (wraps `awesome_video_player` / BetterPlayer-based engine)
 
 ### Launching Playback
+
 - From `MediaDetailsScreen`, the **Play** / **Continue Watching** button uses `resumeEpisodeProvider` to resolve which episode to play.
 - `WatchProgressService.getResumeEpisode(contentId)` determines the best episode using this priority:
   1. Most recently watched in-progress (unfinished) episode with `fileStatus = ready`.
@@ -351,12 +367,14 @@ Triggered manually by the user (e.g., a "Sync Vault" action). Used to reconcile 
   3. First `ready` episode in the content.
 
 ### Saving Progress
+
 - The player periodically calls `WatchProgressService.saveProgress()`.
 - `WatchProgress` is upserted to the `watch_progress` table (one row per episode, keyed by `episodeId`).
 - An episode is marked `isFinished = true` when `position / duration ≥ 0.9` (90% watched).
 - After saving, Riverpod invalidates `continueWatchingProvider`, `resumeEpisodeProvider`, and `watchProgressProvider` so the Home screen and details screens reflect the latest progress immediately.
 
 ### Continue Watching
+
 - `continueWatchingProvider` queries `WatchProgressRepository.getInProgressContent()` — returns `Content` items with at least one in-progress episode, ordered by `lastWatchedAt` descending.
 
 ---
@@ -366,6 +384,7 @@ Triggered manually by the user (e.g., a "Sync Vault" action). Used to reconcile 
 On first launch (or if the vault root is missing/unavailable), the app shows `StorageSetupScreen` instead of the main shell.
 
 `StorageService.checkIntegrity()` is called via `vaultStatusProvider` at startup and returns one of:
+
 - `VaultStatus.ok` — root exists, write access confirmed, vault structure intact.
 - `VaultStatus.rootMissing` — no root configured or directory was deleted.
 - `VaultStatus.noPermission` — Android storage permission not granted.
@@ -384,6 +403,7 @@ ready   ──► missing   (after file deletion or manual removal)
 ```
 
 `_syncContentStatus()` is the internal method that keeps the parent `Content.fileStatus` in sync with its episodes:
+
 - If **at least one** episode is `ready` → Content is `ready`.
 - If **all** episodes are `missing` → Content is `missing` (ghost).
 
@@ -391,12 +411,12 @@ ready   ──► missing   (after file deletion or manual removal)
 
 ## Key Services Reference
 
-| Service | Responsibility |
-|---|---|
-| `ImportService` | Orchestrates scout, link, relink, delete operations. Writes DB + metadata. |
-| `MetadataService` | Reads and writes `.metadata.json` for each pod. |
-| `StorageService` | Manages the vault root, pod/season directory creation, and file path conventions. |
-| `ArtworkService` | Downloads poster and backdrop from TMDB CDN into the pod. |
-| `TMDBService` | Wraps TMDB REST API: `searchMulti`, `getMovieDetails`, `getSeriesDetails`, `getSeasonDetails`. |
-| `VaultSyncService` | Reconciles filesystem against DB by reading `.metadata.json` files. |
-| `WatchProgressService` | Determines resume episode; saves/upserts watch progress; invalidates Riverpod providers. |
+| Service                | Responsibility                                                                                 |
+| ---------------------- | ---------------------------------------------------------------------------------------------- |
+| `ImportService`        | Orchestrates scout, link, relink, delete operations. Writes DB + metadata.                     |
+| `MetadataService`      | Reads and writes `.metadata.json` for each pod.                                                |
+| `StorageService`       | Manages the vault root, pod/season directory creation, and file path conventions.              |
+| `ArtworkService`       | Downloads poster and backdrop from TMDB CDN into the pod.                                      |
+| `TMDBService`          | Wraps TMDB REST API: `searchMulti`, `getMovieDetails`, `getSeriesDetails`, `getSeasonDetails`. |
+| `VaultSyncService`     | Reconciles filesystem against DB by reading `.metadata.json` files.                            |
+| `WatchProgressService` | Determines resume episode; saves/upserts watch progress; invalidates Riverpod providers.       |

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/data/models/content.dart';
 import 'package:krate/providers/providers.dart';
-import 'package:krate/ui/screens/library/media_details_screen.dart';
+import 'package:krate/ui/screens/media_details/media_details_screen.dart';
 import 'package:krate/ui/screens/player/player_screen.dart';
 import 'package:krate/ui/widgets/unavailable_overlay.dart';
 import 'package:krate/utils/constants.dart';

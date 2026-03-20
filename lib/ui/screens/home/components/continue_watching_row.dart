@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:krate/data/models/content.dart';
-import 'package:krate/ui/widgets/continue_watching_card.dart';
+import 'package:krate/ui/screens/home/components/continue_watching_card.dart';
 
 class ContinueWatchingRow extends StatelessWidget {
   final List<Content> items;

@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/data/models/content.dart';
 import 'package:krate/providers/providers.dart';
-import 'package:krate/ui/screens/library/media_details_screen.dart';
+import 'package:krate/ui/screens/media_details/media_details_screen.dart';
 import 'package:krate/ui/widgets/media_card_row.dart';
-import 'package:krate/ui/widgets/continue_watching_row.dart';
+import 'package:krate/ui/screens/home/components/continue_watching_row.dart';
+import 'package:krate/ui/screens/home/components/home_empty_state.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -52,7 +53,6 @@ class HomeScreen extends ConsumerWidget {
     AsyncValue<List<Content>> recentMovies,
     AsyncValue<List<Content>> recentSeries,
   ) {
-    final theme = Theme.of(context);
     final hasData =
         (continueWatching.valueOrNull?.isNotEmpty ?? false) ||
         (recentMovies.valueOrNull?.isNotEmpty ?? false) ||
@@ -64,35 +64,7 @@ class HomeScreen extends ConsumerWidget {
         recentSeries.isLoading;
 
     if (!hasData && !isLoading) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.movie_filter_outlined,
-              size: 80,
-              color: theme.colorScheme.outlineVariant,
-            ),
-            const SizedBox(height: 16),
-            Text('Your library is empty', style: theme.textTheme.headlineSmall),
-            const SizedBox(height: 8),
-            Text(
-              'Import your favourite movies or series',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.outline,
-              ),
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: () {
-                ref.read(shellTabIndexProvider.notifier).state = 1;
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Go to Library'),
-            ),
-          ],
-        ),
-      );
+      return const HomeEmptyState();
     }
 
     return ListView(
@@ -106,10 +78,7 @@ class HomeScreen extends ConsumerWidget {
               ref.read(shellTabIndexProvider.notifier).state = 2;
             },
           ),
-          loading: () => const SizedBox(
-            height: 200,
-            child: Center(child: CircularProgressIndicator()),
-          ),
+          loading: () => const SizedBox.shrink(),
           error: (e, _) => const SizedBox.shrink(),
         ),
 

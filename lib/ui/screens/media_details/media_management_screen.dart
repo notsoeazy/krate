@@ -4,9 +4,9 @@ import 'package:krate/data/models/content.dart';
 import 'package:krate/data/models/episode.dart';
 import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/widgets/busy_overlay.dart';
-import 'package:krate/ui/widgets/media_management_bottom_bar.dart';
-import 'package:krate/ui/widgets/media_management_movie_list.dart';
-import 'package:krate/ui/widgets/media_management_series_list.dart';
+import 'package:krate/ui/screens/media_details/components/media_management_movie_list.dart';
+import 'package:krate/ui/screens/media_details/components/media_management_series_list.dart';
+import 'package:krate/ui/screens/media_details/components/media_management_bottom_bar.dart';
 import 'package:krate/utils/constants.dart';
 
 class MediaManagementScreen extends ConsumerStatefulWidget {
@@ -21,8 +21,6 @@ class MediaManagementScreen extends ConsumerStatefulWidget {
 class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
   MediaManagementNotifier get _notifier =>
       ref.read(mediaManagementProvider(widget.contentId).notifier);
-
-  // Operations
 
   Future<void> _runImport(Content content) async {
     final s = ref.read(mediaManagementProvider(widget.contentId));
@@ -112,7 +110,7 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
       final importJobs = ref.read(importJobsProvider.notifier);
       final importService = ref.read(importServiceProvider);
 
-      // 1. Combined Sync: Try TMDB Fetch first
+      // Combined Sync: Try TMDB Fetch first
       try {
         if (isSeries) {
           await importJobs.fetchMetadataSeries(
@@ -126,11 +124,13 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
           );
         }
       } catch (e) {
-        debugPrint('[MediaManagement] Metadata fetch failed (likely offline): $e');
+        debugPrint(
+          '[MediaManagement] Metadata fetch failed (likely offline): $e',
+        );
         // If offline, we just continue to Vault Sync
       }
 
-      // 2. Vault Sync (targeted)
+      // Vault Sync (targeted)
       if (content.podPath != null) {
         await ref
             .read(vaultSyncProvider.notifier)
@@ -138,16 +138,14 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Sync complete')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Sync complete')));
       }
     } finally {
       if (mounted) _notifier.markJobDone();
     }
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -163,32 +161,14 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
         final isSeries = content.contentType == ContentType.series;
 
         return Scaffold(
-          appBar: AppBar(
-            title: Text('Manage ${content.title}'),
-            // Toolbar Actions
-            actions: [
-              if (isSeries && !s.isDeleteMode)
-                IconButton(
-                  icon: const Icon(Icons.sync_outlined),
-                  tooltip: 'Rescan from TMDB',
-                  onPressed: s.canScan ? () => _runSync(content) : null,
-                ),
-              if (!s.isDeleteMode)
-                IconButton(
-                  icon: const Icon(Icons.delete_outline),
-                  tooltip: 'Delete episodes',
-                  onPressed: s.canSwitchToDelete
-                      ? _notifier.enterDeleteMode
-                      : null,
-                )
-              else
-                TextButton(
-                  onPressed: s.hasJobRunning ? null : _notifier.exitDeleteMode,
-                  child: const Text('Cancel'),
-                ),
-            ],
+          appBar: _MediaManagementAppBar(
+            title: content.title,
+            isSeries: isSeries,
+            state: s,
+            onSync: () => _runSync(content),
+            onEnterDelete: _notifier.enterDeleteMode,
+            onExitDelete: _notifier.exitDeleteMode,
           ),
-          // Content Stack
           body: Stack(
             children: [
               // Episode Selection List
@@ -222,15 +202,16 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
                 const BusyOverlay(message: 'Accessing storage…'),
             ],
           ),
-          // Bottom Action Bar
           bottomNavigationBar: episodesAsync
-              .whenData((eps) => MediaManagementBottomBar(
-                    state: s,
-                    content: content,
-                    episodes: eps,
-                    onImport: () => _runImport(content),
-                    onDelete: () => _runDelete(content, eps),
-                  ))
+              .whenData(
+                (eps) => MediaManagementBottomBar(
+                  state: s,
+                  content: content,
+                  episodes: eps,
+                  onImport: () => _runImport(content),
+                  onDelete: () => _runDelete(content, eps),
+                ),
+              )
               .value,
         );
       },
@@ -239,4 +220,51 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
       error: (e, _) => Scaffold(body: Center(child: Text('Error: $e'))),
     );
   }
+}
+
+class _MediaManagementAppBar extends StatelessWidget implements PreferredSizeWidget {
+  final String title;
+  final bool isSeries;
+  final MediaManagementState state;
+  final VoidCallback onSync;
+  final VoidCallback onEnterDelete;
+  final VoidCallback onExitDelete;
+
+  const _MediaManagementAppBar({
+    required this.title,
+    required this.isSeries,
+    required this.state,
+    required this.onSync,
+    required this.onEnterDelete,
+    required this.onExitDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppBar(
+      title: Text('Manage $title'),
+      actions: [
+        if (isSeries && !state.isDeleteMode)
+          IconButton(
+            icon: const Icon(Icons.sync_outlined),
+            tooltip: 'Rescan from TMDB',
+            onPressed: state.canScan ? onSync : null,
+          ),
+        if (!state.isDeleteMode)
+          IconButton(
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'Delete episodes',
+            onPressed: state.canSwitchToDelete ? onEnterDelete : null,
+          )
+        else
+          TextButton(
+            onPressed: state.hasJobRunning ? null : onExitDelete,
+            child: const Text('Cancel'),
+          ),
+      ],
+    );
+  }
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 }

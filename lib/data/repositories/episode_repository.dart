@@ -165,6 +165,7 @@ class EpisodeRepository {
 
   // Returns the next unwatched episode after [currentEpisode] for series navigation.
   Future<Episode?> getNextEpisode(Episode currentEpisode) async {
+    if (currentEpisode.isMovie) return null;
     final db = await _db.database;
     // Try next episode in same season first
     var rows = await db.query(

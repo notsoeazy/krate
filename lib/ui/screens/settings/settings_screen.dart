@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-
-import 'package:krate/ui/widgets/settings_section_header.dart';
-import 'package:krate/ui/widgets/settings_storage_card.dart';
-import 'package:krate/ui/widgets/settings_about_card.dart';
+import 'package:krate/ui/screens/settings/components/settings_about_section.dart';
+import 'package:krate/ui/screens/settings/components/settings_storage_section.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -12,19 +10,36 @@ class SettingsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
-        children: const [
+        children: [
           // Storage
-          SettingsSectionHeader(title: 'Storage'),
-          StorageSettingsCard(),
+          _settingsSectionHeader('Storage', context),
+          SettingsStorageSection(),
 
           SizedBox(height: 8),
 
           // About
-          SettingsSectionHeader(title: 'About'),
-          AboutSettingsCard(),
+          _settingsSectionHeader('About', context),
+          SettingsAboutSection(),
 
-          SizedBox(height: 24),
+          SizedBox(height: 8),
+
+          // Licenses
+          // _settingsSectionHeader('License', context),
+          // TODO: Implement licenses
         ],
+      ),
+    );
+  }
+
+  Widget _settingsSectionHeader(String title, BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 16, 16, 8),
+      child: Text(
+        title.toUpperCase(),
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+          color: Theme.of(context).colorScheme.primary,
+          letterSpacing: 1.0,
+        ),
       ),
     );
   }

@@ -4,8 +4,7 @@ import 'package:krate/providers/providers.dart';
 
 enum ManagedTileMode { normal, delete }
 
-/// A [ListTile]-based widget for displaying an episode in the management screen.
-class ManagedEpisodeTile extends StatelessWidget {
+class MediaManagementEpisodeTile extends StatelessWidget {
   final Episode episode;
   final ManagedTileMode mode;
   final bool isSelected;
@@ -15,7 +14,7 @@ class ManagedEpisodeTile extends StatelessWidget {
   final VoidCallback? onRemoveFile;
   final VoidCallback? onAddSubtitles;
 
-  const ManagedEpisodeTile({
+  const MediaManagementEpisodeTile({
     super.key,
     required this.episode,
     this.mode = ManagedTileMode.normal,
@@ -56,7 +55,10 @@ class ManagedEpisodeTile extends StatelessWidget {
     return Column(
       children: [
         ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 4,
+          ),
           leading: _buildEpisodeNumber(theme),
           title: Text(
             episode.title ?? 'Episode ${episode.episodeNumber}',
@@ -75,10 +77,14 @@ class ManagedEpisodeTile extends StatelessWidget {
     );
   }
 
-  bool get _hasSubtitles => episode.subtitles.isNotEmpty || (stagedFile?.subtitlePaths.isNotEmpty ?? false);
+  bool get _hasSubtitles =>
+      episode.subtitles.isNotEmpty ||
+      (stagedFile?.subtitlePaths.isNotEmpty ?? false);
 
   Widget _buildSubtitleList(ThemeData theme) {
-    final paths = stagedFile?.subtitlePaths ?? episode.subtitles.map((s) => s.path).toList();
+    final paths =
+        stagedFile?.subtitlePaths ??
+        episode.subtitles.map((s) => s.path).toList();
     return Padding(
       padding: const EdgeInsets.only(left: 72.0, right: 16.0, bottom: 8.0),
       child: Row(
@@ -120,8 +126,13 @@ class ManagedEpisodeTile extends StatelessWidget {
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
-                  _formatSubtitleList(stagedFile?.subtitlePaths ?? episode.subtitles.map((s) => s.path).toList()),
-                  style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline),
+                  _formatSubtitleList(
+                    stagedFile?.subtitlePaths ??
+                        episode.subtitles.map((s) => s.path).toList(),
+                  ),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.outline,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -214,11 +225,17 @@ class ManagedEpisodeTile extends StatelessWidget {
             tooltip: 'Add Subtitles',
           ),
         IconButton(
-          icon: Icon(stagedFile != null
-              ? Icons.close
-              : (episode.hasFile ? Icons.swap_horiz : Icons.add_circle_outline)),
+          icon: Icon(
+            stagedFile != null
+                ? Icons.close
+                : (episode.hasFile
+                      ? Icons.swap_horiz
+                      : Icons.add_circle_outline),
+          ),
           color: (episode.hasFile || stagedFile != null)
-              ? (stagedFile != null ? theme.colorScheme.error : theme.colorScheme.primary)
+              ? (stagedFile != null
+                    ? theme.colorScheme.error
+                    : theme.colorScheme.primary)
               : null,
           onPressed: stagedFile != null ? onRemoveFile : onImport,
           tooltip: stagedFile != null

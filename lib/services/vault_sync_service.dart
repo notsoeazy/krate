@@ -371,7 +371,7 @@ class VaultSyncService {
             ),
           );
         } else {
-          debugPrint('[VaultSync] Pod [$tmdbId]: NO MEDIA FILE FOUND for S${seasonStr}E${episodeStr}');
+          debugPrint('[VaultSync] Pod [$tmdbId]: NO MEDIA FILE FOUND for S$seasonStr E$episodeStr');
           syncedEpisodes.add(
             ep.copyWith(clearVideoPath: true, fileStatus: FileStatus.missing),
           );

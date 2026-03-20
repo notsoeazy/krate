@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-class MediaMoreMenuButton extends StatelessWidget {
+class MediaDetailsMoreMenu extends StatelessWidget {
   final VoidCallback onManage;
   final VoidCallback onVaultSync;
   final VoidCallback onFetchMetadata;
 
-  const MediaMoreMenuButton({
+  const MediaDetailsMoreMenu({
     super.key,
     required this.onManage,
     required this.onVaultSync,

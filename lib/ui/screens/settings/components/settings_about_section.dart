@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-class AboutSettingsCard extends StatelessWidget {
-  const AboutSettingsCard({super.key});
+class SettingsAboutSection extends StatelessWidget {
+  const SettingsAboutSection({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +42,7 @@ class AboutSettingsCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'Version 0.2.0-beta',
+                    'Version 0.3.0-beta',
                     style: textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.outline,
                     ),
@@ -74,13 +74,6 @@ class AboutSettingsCard extends StatelessWidget {
                 ),
               ],
             ),
-
-            const SizedBox(height: 16),
-            const Divider(),
-            const SizedBox(height: 16),
-
-            // Licenses
-            // TODO: Implement licenses
           ],
         ),
       ),

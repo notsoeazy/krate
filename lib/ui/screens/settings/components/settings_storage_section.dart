@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/providers/providers.dart';
 
-class StorageSettingsCard extends ConsumerWidget {
-  const StorageSettingsCard({super.key});
+class SettingsStorageSection extends ConsumerWidget {
+  const SettingsStorageSection({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

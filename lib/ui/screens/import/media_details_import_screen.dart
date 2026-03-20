@@ -5,8 +5,8 @@ import 'package:krate/utils/errors.dart';
 import 'package:krate/data/models/content.dart';
 import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/widgets/busy_overlay.dart';
-import 'package:krate/ui/widgets/media_import_preview.dart';
-import 'package:krate/ui/widgets/file_picker_tile.dart';
+import 'package:krate/ui/screens/import/components/media_import_preview.dart';
+import 'package:krate/ui/screens/import/components/file_picker_tile.dart';
 import 'package:krate/ui/screens/import/series_episode_picker_screen.dart';
 import 'package:krate/utils/file_utils.dart';
 
@@ -75,9 +75,9 @@ class _MediaDetailsImportScreenState
       }
     } on KrateException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
       }
     } catch (e) {
       if (mounted) {
@@ -161,14 +161,11 @@ class _MediaDetailsImportScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Preview
-                MediaImportPreview(
-                  content: _content!,
-                  type: widget.type,
-                ),
+                MediaImportPreview(content: _content!, type: widget.type),
 
                 const SizedBox(height: 32),
 
-                // File Picker
+                // File Picker for movies
                 if (widget.type == ContentType.movie) ...[
                   FilePickerTile(
                     selectedFilePath: _selectedFilePath,

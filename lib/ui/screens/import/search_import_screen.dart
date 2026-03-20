@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/widgets/empty_state_view.dart';
-import 'package:krate/ui/widgets/search_result_tile.dart';
+import 'package:krate/ui/screens/import/components/search_result_tile.dart';
 
 class SearchImportScreen extends ConsumerStatefulWidget {
   const SearchImportScreen({super.key});

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:krate/data/models/episode.dart';
 import 'package:krate/providers/providers.dart';
-import 'package:krate/ui/widgets/managed_episode_tile.dart';
+import 'package:krate/ui/screens/media_details/components/media_management_episode_tile.dart';
 
 class MediaManagementMovieList extends StatelessWidget {
   final Episode movieEp;
@@ -19,7 +19,7 @@ class MediaManagementMovieList extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       children: [
-        ManagedEpisodeTile(
+        MediaManagementEpisodeTile(
           episode: movieEp,
           mode: state.isDeleteMode
               ? ManagedTileMode.delete

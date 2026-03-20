@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:krate/data/models/content.dart';
 import 'package:krate/utils/constants.dart';
 
-class MediaBackdrop extends StatelessWidget {
+class MediaDetailsBackdrop extends StatelessWidget {
   final Content content;
 
-  const MediaBackdrop({super.key, required this.content});
+  const MediaDetailsBackdrop({super.key, required this.content});
 
   Widget _posterFallback() {
     if (content.localPosterPath != null) {

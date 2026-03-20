@@ -25,7 +25,7 @@ class UnavailableOverlay extends StatelessWidget {
     return Stack(
       fit: StackFit.passthrough,
       children: [
-        if (child != null) child!,
+        ?child,
         Positioned.fill(
           child: Container(
             decoration: BoxDecoration(
