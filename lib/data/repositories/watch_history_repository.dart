@@ -60,4 +60,13 @@ class WatchHistoryRepository {
     final db = await _db.database;
     await db.delete('watch_history');
   }
+
+  Future<void> deleteByContentId(int contentId) async {
+    final db = await _db.database;
+    await db.delete(
+      'watch_history',
+      where: 'contentId = ?',
+      whereArgs: [contentId],
+    );
+  }
 }

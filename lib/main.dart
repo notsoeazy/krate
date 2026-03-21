@@ -21,7 +21,7 @@ class KrateApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final vaultStatus = ref.watch(vaultStatusProvider);
+    final vaultStatus = ref.watch(startupProvider);
 
     final textTheme = createTextTheme(context, kBodyFont, kDisplayFont);
     final materialTheme = MaterialTheme(textTheme);
@@ -38,7 +38,7 @@ class KrateApp extends ConsumerWidget {
           if (status == VaultStatus.ok) return const ShellScreen();
           return const StorageSetupScreen();
         },
-        loading: () => const SplashScreen(isInitial: true),
+        loading: () => const SplashScreen(),
         error: (e, _) => Scaffold(body: Center(child: Text('Error: $e'))),
       ),
     );

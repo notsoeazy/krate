@@ -44,6 +44,7 @@ class MediaDetailsSeasonList extends ConsumerWidget {
           itemBuilder: (context, index) {
             final ep = eps[index];
             return MediaDetailsEpisodeTile(
+              contentId: contentId,
               episode: ep,
               onPlay: () {
                 if (ep.id != null) {

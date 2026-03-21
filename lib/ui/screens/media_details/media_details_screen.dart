@@ -10,6 +10,9 @@ import 'package:krate/data/models/episode.dart';
 import 'package:krate/ui/screens/media_details/components/media_details_backdrop.dart';
 import 'package:krate/ui/screens/media_details/components/media_details_more_menu.dart';
 import 'package:krate/ui/screens/media_details/components/media_details_season_list.dart';
+import 'package:krate/ui/screens/media_details/components/media_details_selection_toolbar.dart';
+import 'package:krate/ui/screens/media_details/components/media_details_season_selection_modal.dart';
+import 'package:krate/ui/widgets/confirmation_dialog.dart';
 import 'package:krate/ui/widgets/media_info_row.dart';
 import 'package:krate/ui/widgets/media_overview_section.dart';
 
@@ -171,6 +174,8 @@ class _MediaDetailsScaffoldState extends ConsumerState<_MediaDetailsScaffold>
         ),
     ];
 
+    final selectionState = ref.watch(watchedSelectionProvider(content.id!));
+
     return Scaffold(
       body: isSeries
           ? NestedScrollView(
@@ -188,12 +193,18 @@ class _MediaDetailsScaffoldState extends ConsumerState<_MediaDetailsScaffold>
               ),
             )
           : CustomScrollView(slivers: headerSlivers),
+      bottomNavigationBar: selectionState.isSelectionMode
+          ? MediaDetailsSelectionToolbar(
+              contentId: content.id!,
+              selectedCount: selectionState.selectedEpisodeIds.length,
+            )
+          : null,
     );
   }
-
 }
 
-class _MediaDetailsAppBar extends StatelessWidget {
+
+class _MediaDetailsAppBar extends ConsumerWidget {
   final Content content;
   final VoidCallback onVaultSync;
   final VoidCallback onFetchMetadata;
@@ -205,7 +216,7 @@ class _MediaDetailsAppBar extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     return SliverAppBar(
       expandedHeight: _kExpandedHeight,
@@ -218,7 +229,9 @@ class _MediaDetailsAppBar extends StatelessWidget {
           if (settings == null) return const SizedBox.shrink();
           final deltaExtent = settings.maxExtent - settings.minExtent;
           final t =
-              (1.0 - (settings.currentExtent - settings.minExtent) / deltaExtent)
+              (1.0 -
+                      (settings.currentExtent - settings.minExtent) /
+                          deltaExtent)
                   .clamp(0.0, 1.0);
           return Opacity(
             opacity: t > 0.8 ? (t - 0.8) * 5 : 0.0,
@@ -237,13 +250,44 @@ class _MediaDetailsAppBar extends StatelessWidget {
       ),
       actions: [
         MediaDetailsMoreMenu(
+          contentType: content.contentType,
           onManage: () => Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => MediaManagementScreen(contentId: content.id!),
+              builder: (context) =>
+                  MediaManagementScreen(contentId: content.id!),
             ),
           ),
           onVaultSync: onVaultSync,
           onFetchMetadata: onFetchMetadata,
+          onEnterSelectionMode: () {
+            ref
+                .read(watchedSelectionProvider(content.id!).notifier)
+                .enterSelectionMode();
+          },
+          onMarkSeasons: () =>
+              MediaDetailsSeasonSelectionModal.show(context, content),
+          onMarkFinished: () async {
+            if (content.contentType == ContentType.movie) {
+              await ref
+                  .read(watchProgressServiceProvider)
+                  .markSeasonFinished(content.id!, 0);
+            }
+          },
+          onClearSeriesProgress: () async {
+            final confirmed = await ConfirmationDialog.show(
+              context,
+              title: 'Clear watch history?',
+              message:
+                  'This will remove all watch progress for ${content.title}. This action cannot be undone.',
+              confirmLabel: 'Clear',
+              isDestructive: true,
+            );
+            if (confirmed) {
+              await ref
+                  .read(watchProgressServiceProvider)
+                  .clearSeriesProgress(content.id!);
+            }
+          },
         ),
       ],
       flexibleSpace: FlexibleSpaceBar(
@@ -314,8 +358,12 @@ class _MediaDetailsActionRow extends ConsumerWidget {
         return progressAsync.when(
           data: (progress) {
             final isResume =
-                progress != null && progress.positionMs > 0 && !progress.isFinished;
-            final finalLabel = isResume ? label.replaceFirst('Play', 'Resume') : label;
+                progress != null &&
+                progress.positionMs > 0 &&
+                !progress.isFinished;
+            final finalLabel = isResume
+                ? label.replaceFirst('Play', 'Resume')
+                : label;
             return _buildButtonRow(
               context,
               ref,
@@ -325,14 +373,8 @@ class _MediaDetailsActionRow extends ConsumerWidget {
               theme,
             );
           },
-          loading: () => _buildButtonRow(
-            context,
-            ref,
-            episode,
-            label,
-            false,
-            theme,
-          ),
+          loading: () =>
+              _buildButtonRow(context, ref, episode, label, false, theme),
           error: (_, _) => _buildButtonRow(
             context,
             ref,
@@ -343,14 +385,7 @@ class _MediaDetailsActionRow extends ConsumerWidget {
           ),
         );
       },
-      loading: () => _buildButtonRow(
-        context,
-        ref,
-        null,
-        'Play',
-        false,
-        theme,
-      ),
+      loading: () => _buildButtonRow(context, ref, null, 'Play', false, theme),
       error: (_, _) => const SizedBox.shrink(),
     );
   }
@@ -378,10 +413,11 @@ class _MediaDetailsActionRow extends ConsumerWidget {
             child: FilledButton.icon(
               onPressed: (hasFile && !loading && episode != null)
                   ? () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => PlayerScreen(episodeId: episode.id!),
-                        ),
-                      )
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            PlayerScreen(episodeId: episode.id!),
+                      ),
+                    )
                   : null,
               icon: loading
                   ? const SizedBox(
@@ -429,7 +465,9 @@ class _MediaDetailsActionRow extends ConsumerWidget {
                 content?.isFavorite == true
                     ? Icons.favorite_rounded
                     : Icons.favorite_outline_rounded,
-                color: content?.isFavorite == true ? theme.colorScheme.error : null,
+                color: content?.isFavorite == true
+                    ? theme.colorScheme.error
+                    : null,
                 size: 22,
               ),
             ),

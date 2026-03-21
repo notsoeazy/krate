@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:krate/ui/screens/settings/components/settings_about_section.dart';
 import 'package:krate/ui/screens/settings/components/settings_storage_section.dart';
 import 'package:krate/ui/screens/settings/components/settings_backup_section.dart';
+import 'package:krate/ui/screens/settings/components/settings_debug_section.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -20,9 +21,15 @@ class SettingsScreen extends StatelessWidget {
 
           // Backup
           _settingsSectionHeader('Backup', context),
-          SettingsBackupSection(),
+          const SettingsBackupSection(),
 
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
+
+          // Debug
+          _settingsSectionHeader('Debug (UI Testing)', context),
+          const SettingsDebugSection(),
+
+          const SizedBox(height: 8),
 
           // About
           _settingsSectionHeader('About', context),

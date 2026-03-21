@@ -90,6 +90,7 @@ final watchProgressServiceProvider = Provider<WatchProgressService>((ref) {
   return WatchProgressService(
     progressRepo: ref.read(watchProgressRepoProvider),
     episodeRepo: ref.read(episodeRepoProvider),
+    historyRepo: ref.read(watchHistoryRepoProvider),
     ref: ref,
   );
 });
@@ -98,10 +99,43 @@ final backupServiceProvider = Provider<BackupService>((ref) {
   return BackupService(ref.read(storageServiceProvider));
 });
 
-// Vault status (checked on startup)
-final vaultStatusProvider = FutureProvider<VaultStatus>((ref) {
-  return ref.read(storageServiceProvider).checkIntegrity();
+// Startup provider that performs checks, cleanup, scouting, and pre-fetching.
+final startupProvider = FutureProvider<VaultStatus>((ref) async {
+  final startTime = DateTime.now();
+
+  final storageService = ref.read(storageServiceProvider);
+  final status = await storageService.checkIntegrity();
+
+  if (status == VaultStatus.ok) {
+    final importService = ref.read(importServiceProvider);
+    await importService.cleanupFailedImports();
+
+    final syncService = ref.read(vaultSyncServiceProvider);
+    final changesDetected = await syncService.scout();
+    if (changesDetected) {
+      ref.read(vaultChangesDetectedProvider.notifier).state = true;
+    }
+
+    try {
+      await Future.wait([
+        ref.read(continueWatchingProvider.future),
+        ref.read(recentMoviesProvider.future),
+        ref.read(recentSeriesProvider.future),
+      ]);
+    } catch (_) {
+      // Ignore pre-fetch errors, they'll be handled by the UI
+    }
+  }
+
+  final elapsed = DateTime.now().difference(startTime);
+  if (elapsed < kMinSplashDuration) {
+    await Future.delayed(kMinSplashDuration - elapsed);
+  }
+
+  return status;
 });
+
+final vaultChangesDetectedProvider = StateProvider<bool>((ref) => false);
 
 // Backup status
 final lastBackupTimeProvider = FutureProvider<DateTime?>((ref) async {
@@ -368,6 +402,15 @@ class VaultSyncNotifier
     _ref.invalidate(recentSeriesProvider);
     _ref.invalidate(continueWatchingProvider);
     _ref.invalidate(mergedEpisodesProvider);
+  }
+
+  /// TODO: Make sure to remove this when done testing for toast,modals, etc
+  void debugUpdate({bool? isSyncing, double? progress, String? status}) {
+    state = (
+      isSyncing: isSyncing ?? state.isSyncing,
+      progress: progress ?? state.progress,
+      status: status ?? state.status,
+    );
   }
 }
 
@@ -716,4 +759,55 @@ class MediaManagementNotifier extends StateNotifier<MediaManagementState> {
 final mediaManagementProvider = StateNotifierProvider.autoDispose
     .family<MediaManagementNotifier, MediaManagementState, int>(
       (ref, contentId) => MediaManagementNotifier(),
+    );
+
+// Watched Selection state for MediaDetailsScreen
+@immutable
+class WatchedSelectionState {
+  final bool isSelectionMode;
+  final Set<int> selectedEpisodeIds;
+
+  const WatchedSelectionState({
+    this.isSelectionMode = false,
+    this.selectedEpisodeIds = const {},
+  });
+
+  WatchedSelectionState copyWith({
+    bool? isSelectionMode,
+    Set<int>? selectedEpisodeIds,
+  }) => WatchedSelectionState(
+    isSelectionMode: isSelectionMode ?? this.isSelectionMode,
+    selectedEpisodeIds: selectedEpisodeIds ?? this.selectedEpisodeIds,
+  );
+}
+
+class WatchedSelectionNotifier extends StateNotifier<WatchedSelectionState> {
+  WatchedSelectionNotifier() : super(const WatchedSelectionState());
+
+  void enterSelectionMode() {
+    state = state.copyWith(isSelectionMode: true, selectedEpisodeIds: {});
+  }
+
+  void exitSelectionMode() {
+    state = const WatchedSelectionState();
+  }
+
+  void toggleSelection(int episodeId) {
+    final updated = Set<int>.from(state.selectedEpisodeIds);
+    if (updated.contains(episodeId)) {
+      updated.remove(episodeId);
+    } else {
+      updated.add(episodeId);
+    }
+    state = state.copyWith(selectedEpisodeIds: updated);
+  }
+
+  void selectAll(List<int> episodeIds) {
+    state = state.copyWith(selectedEpisodeIds: Set.from(episodeIds));
+  }
+}
+
+final watchedSelectionProvider = StateNotifierProvider.autoDispose
+    .family<WatchedSelectionNotifier, WatchedSelectionState, int>(
+      (ref, contentId) => WatchedSelectionNotifier(),
     );

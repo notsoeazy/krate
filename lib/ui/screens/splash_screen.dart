@@ -1,19 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:krate/providers/providers.dart';
-import 'package:krate/services/storage_service.dart';
-import 'package:krate/ui/screens/shell_screen.dart';
-import 'package:krate/ui/screens/storage_setup_screen.dart';
 
-class SplashScreen extends ConsumerStatefulWidget {
-  final bool isInitial;
-  const SplashScreen({super.key, this.isInitial = false});
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
 
   @override
-  ConsumerState<SplashScreen> createState() => _SplashScreenState();
+  State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends ConsumerState<SplashScreen>
+class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
@@ -40,77 +34,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     );
 
     _controller.forward();
-    _performStartup();
   }
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
-  }
-
-  Future<void> _performStartup() async {
-    if (widget.isInitial) return;
-
-    final startTime = DateTime.now();
-
-    // Wait for vault status to be determined
-    final vaultStatus = await ref.read(vaultStatusProvider.future);
-
-    if (vaultStatus != VaultStatus.ok) {
-      _navigateTo(const StorageSetupScreen());
-      return;
-    }
-
-    // Perform quick scan/scout
-    final importService = ref.read(importServiceProvider);
-    await importService.cleanupFailedImports();
-
-    final syncService = ref.read(vaultSyncServiceProvider);
-    final needsSync = await syncService.scout();
-
-    if (needsSync && mounted) {
-      final container = ProviderScope.containerOf(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Vault directory changes detected.'),
-          action: SnackBarAction(
-            label: 'Sync Now',
-            onPressed: () {
-              container.read(vaultSyncProvider.notifier).sync();
-            },
-          ),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 5),
-        ),
-      );
-    }
-
-    // Pre-fetch home screen data
-    ref.read(continueWatchingProvider.future);
-    ref.read(recentMoviesProvider.future);
-    ref.read(recentSeriesProvider.future);
-
-    final elapsed = DateTime.now().difference(startTime);
-    final remaining = const Duration(milliseconds: 2000) - elapsed;
-    if (remaining.inMilliseconds > 0) {
-      await Future.delayed(remaining);
-    }
-
-    _navigateTo(const ShellScreen());
-  }
-
-  void _navigateTo(Widget screen) {
-    if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => screen,
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-        transitionDuration: const Duration(milliseconds: 500),
-      ),
-    );
   }
 
   @override

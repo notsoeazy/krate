@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/providers/providers.dart';
+import 'package:krate/ui/widgets/confirmation_dialog.dart';
 import 'package:krate/utils/extensions.dart';
 
 class SettingsBackupSection extends ConsumerWidget {
@@ -70,24 +71,12 @@ class SettingsBackupSection extends ConsumerWidget {
   }
 
   Future<void> _handleRestore(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Restore Database?'),
-        content: const Text(
+    final confirmed = await ConfirmationDialog.show(
+      context,
+      title: 'Restore Database?',
+      message:
           'This will overwrite your current library and watch progress with the data from the backup file. This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Restore'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Restore',
     );
 
     if (confirmed == true) {

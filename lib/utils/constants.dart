@@ -41,3 +41,6 @@ const kDisplayFont = 'Inter';
 // File Extensions
 const kAllowedVideoExtensions = ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'webm', 'flv'];
 const kAllowedSubtitleExtensions = ['srt', 'vtt', 'ass', 'ssa'];
+
+// Splash Screen
+const kMinSplashDuration = Duration(milliseconds: 2000);

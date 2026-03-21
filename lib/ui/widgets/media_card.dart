@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/utils/constants.dart';
 import 'package:krate/data/models/content.dart';
 import 'package:krate/providers/providers.dart';
+import 'package:krate/ui/screens/media_details/media_management_screen.dart';
+import 'package:krate/ui/widgets/confirmation_dialog.dart';
 import 'package:krate/ui/widgets/unavailable_overlay.dart';
 
 class MediaCard extends ConsumerWidget {
@@ -33,13 +35,14 @@ class MediaCard extends ConsumerWidget {
 
     final isUnavailable = isSeries
         ? (episodeCountAsync?.valueOrNull?.available ?? 0) == 0 &&
-            (episodeCountAsync?.valueOrNull?.total ?? 0) > 0
+              (episodeCountAsync?.valueOrNull?.total ?? 0) > 0
         : content.fileStatus == FileStatus.missing;
 
     return SizedBox(
       width: width,
       child: InkWell(
         onTap: onTap,
+        onLongPress: () => _showQuickActions(context, ref),
         borderRadius: BorderRadius.circular(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -230,6 +233,138 @@ class MediaCard extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  void _showQuickActions(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final service = ref.read(watchProgressServiceProvider);
+    final isSeries = content.contentType == ContentType.series;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(bottom: 16),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Text(
+                  content.title,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const Divider(height: 1),
+              if (!isSeries)
+                ListTile(
+                  leading: const Icon(Icons.done_all_rounded),
+                  title: const Text('Mark as watched'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    final confirmed = await ConfirmationDialog.show(
+                      context,
+                      title: 'Mark as watched?',
+                      message:
+                          'Mark "${content.title}" and all its episodes as watched?',
+                    );
+                    if (confirmed) {
+                      await service.markSeasonFinished(content.id!, 0);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Marked "${content.title}" as watched',
+                            ),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                ),
+              ListTile(
+                leading: const Icon(Icons.history_rounded),
+                title: const Text('Clear watch history'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final confirmed = await ConfirmationDialog.show(
+                    context,
+                    title: 'Clear watch history?',
+                    message:
+                        'This will remove all watch progress for "${content.title}". This action cannot be undone.',
+                    confirmLabel: 'Clear',
+                    isDestructive: true,
+                  );
+                  if (confirmed) {
+                    await service.clearSeriesProgress(content.id!);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Cleared history for "${content.title}"',
+                          ),
+                        ),
+                      );
+                    }
+                  }
+                },
+              ),
+              ListTile(
+                leading: Icon(
+                  content.isFavorite
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_outline_rounded,
+                  color: content.isFavorite ? theme.colorScheme.error : null,
+                ),
+                title: Text(
+                  content.isFavorite
+                      ? 'Remove from favorites'
+                      : 'Add to favorites',
+                ),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await ref
+                      .read(contentRepoProvider)
+                      .setFavorite(content.id!, !content.isFavorite);
+                  ref.invalidate(contentProvider(content.id!));
+                  _invalidateLibrary(ref);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.video_library_outlined),
+                title: const Text('Manage media'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          MediaManagementScreen(contentId: content.id!),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _invalidateLibrary(WidgetRef ref) {
+    ref.invalidate(moviesProvider);
+    ref.invalidate(seriesProvider);
+    ref.invalidate(recentMoviesProvider);
+    ref.invalidate(recentSeriesProvider);
+    ref.invalidate(continueWatchingProvider);
+    ref.invalidate(watchingContentProvider);
+    ref.invalidate(completedContentProvider);
   }
 }
 

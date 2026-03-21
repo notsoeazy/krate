@@ -109,6 +109,84 @@ class WatchProgressRepository {
     );
   }
 
+  Future<void> markEpisodesFinished(List<int> episodeIds, int contentId) async {
+    final db = await _db.database;
+    final now = DateTime.now().toIso8601String();
+    await db.transaction((txn) async {
+      for (final id in episodeIds) {
+        // We use insert with replace to ensure progress entry exists if it didn't before
+        await txn.insert(
+          'watch_progress',
+          {
+            'episodeId': id,
+            'contentId': contentId,
+            'isFinished': 1,
+            'positionMs': 0, // We don't know duration, so 0 is fine since isFinished is 1
+            'durationMs': 0,
+            'lastWatchedAt': now,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+    });
+  }
+
+  Future<void> clearEpisodesProgress(List<int> episodeIds) async {
+    final db = await _db.database;
+    await db.transaction((txn) async {
+      for (final id in episodeIds) {
+        await txn.delete(
+          'watch_progress',
+          where: 'episodeId = ?',
+          whereArgs: [id],
+        );
+      }
+    });
+  }
+
+
+  Future<void> clearSeriesProgress(int contentId) async {
+    final db = await _db.database;
+    await db.delete(
+      'watch_progress',
+      where: 'contentId = ?',
+      whereArgs: [contentId],
+    );
+  }
+
+  Future<void> markSeasonsFinished(int contentId, List<int> seasonNumbers) async {
+    final db = await _db.database;
+    final now = DateTime.now().toIso8601String();
+    await db.transaction((txn) async {
+      for (final sn in seasonNumbers) {
+        await txn.execute(
+          '''
+          INSERT OR REPLACE INTO watch_progress (episodeId, contentId, isFinished, positionMs, durationMs, lastWatchedAt)
+          SELECT id, contentId, 1, 0, 0, ? FROM episodes WHERE contentId = ? AND seasonNumber = ?
+          ''',
+          [now, contentId, sn],
+        );
+      }
+    });
+  }
+
+  Future<void> clearSeasonsProgress(int contentId, List<int> seasonNumbers) async {
+    final db = await _db.database;
+    await db.transaction((txn) async {
+      for (final sn in seasonNumbers) {
+        await txn.delete(
+          'watch_progress',
+          where: 'contentId = ? AND episodeId IN (SELECT id FROM episodes WHERE contentId = ? AND seasonNumber = ?)',
+          whereArgs: [contentId, contentId, sn],
+        );
+      }
+    });
+  }
+
+  Future<void> markSeasonFinished(int contentId, int seasonNumber) async {
+    await markSeasonsFinished(contentId, [seasonNumber]);
+  }
+
   Future<void> clearForEpisode(int episodeId) async {
     final db = await _db.database;
     await db.delete(

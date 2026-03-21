@@ -3,20 +3,25 @@ import 'package:krate/utils/constants.dart';
 import 'package:krate/data/models/episode.dart';
 import 'package:krate/data/models/watch_progress.dart';
 import 'package:krate/data/repositories/episode_repository.dart';
+import 'package:krate/data/repositories/watch_history_repository.dart';
 import 'package:krate/data/repositories/watch_progress_repository.dart';
 import 'package:krate/providers/providers.dart';
+import 'package:flutter/foundation.dart';
 
 class WatchProgressService {
   final WatchProgressRepository _progressRepo;
   final EpisodeRepository _episodeRepo;
+  final WatchHistoryRepository _historyRepo;
   final Ref _ref;
 
   WatchProgressService({
     required WatchProgressRepository progressRepo,
     required EpisodeRepository episodeRepo,
+    required WatchHistoryRepository historyRepo,
     required Ref ref,
   }) : _progressRepo = progressRepo,
        _episodeRepo = episodeRepo,
+       _historyRepo = historyRepo,
        _ref = ref;
 
   // Determines the best episode to resume for a given content item.
@@ -109,5 +114,82 @@ class WatchProgressService {
     if ((a.seasonNumber ?? 0) > (b.seasonNumber ?? 0)) return true;
     if ((a.seasonNumber ?? 0) < (b.seasonNumber ?? 0)) return false;
     return (a.episodeNumber ?? 0) > (b.episodeNumber ?? 0);
+  }
+
+  Future<void> markEpisodesFinished(List<int> episodeIds, int contentId) async {
+    for (final id in episodeIds) {
+      debugPrint('[WatchProgressService] Marking episode $id as finished');
+    }
+    await _progressRepo.markEpisodesFinished(episodeIds, contentId);
+    _invalidateContent(contentId, episodeIds: episodeIds);
+  }
+
+  Future<void> clearEpisodesProgress(
+    List<int> episodeIds,
+    int contentId,
+  ) async {
+    for (final id in episodeIds) {
+      debugPrint('[WatchProgressService] Clearing progress for episode $id');
+    }
+    await _progressRepo.clearEpisodesProgress(episodeIds);
+    _invalidateContent(contentId, episodeIds: episodeIds);
+  }
+
+  Future<void> markSeasonFinished(int contentId, int seasonNumber) async {
+    await markSeasonsFinished(contentId, [seasonNumber]);
+  }
+
+  Future<void> markSeasonsFinished(
+    int contentId,
+    List<int> seasonNumbers,
+  ) async {
+    debugPrint(
+      '[WatchProgressService] Marking seasons $seasonNumbers as finished for content $contentId',
+    );
+    await _progressRepo.markSeasonsFinished(contentId, seasonNumbers);
+    _invalidateContent(contentId);
+  }
+
+  Future<void> clearSeasonsProgress(
+    int contentId,
+    List<int> seasonNumbers,
+  ) async {
+    debugPrint(
+      '[WatchProgressService] Clearing progress for seasons $seasonNumbers for content $contentId',
+    );
+    await _progressRepo.clearSeasonsProgress(contentId, seasonNumbers);
+    _invalidateContent(contentId);
+  }
+
+  Future<void> clearSeriesProgress(int contentId) async {
+    debugPrint(
+      '[WatchProgressService] Clearing ALL progress and history for content $contentId',
+    );
+    await _progressRepo.clearSeriesProgress(contentId);
+    await _historyRepo.deleteByContentId(contentId);
+    _invalidateContent(contentId);
+  }
+
+  void _invalidateContent(int contentId, {List<int>? episodeIds}) async {
+    _ref.invalidate(continueWatchingProvider);
+    _ref.invalidate(watchingContentProvider);
+    _ref.invalidate(completedContentProvider);
+    _ref.invalidate(resumeEpisodeProvider(contentId));
+    _ref.invalidate(contentEpisodesProvider(contentId));
+
+    // If we have specific IDs, invalidate them instantly
+    if (episodeIds != null) {
+      for (final id in episodeIds) {
+        _ref.invalidate(watchProgressProvider(id));
+      }
+    } else {
+      // Otherwise, get all episodes for this content and invalidate them
+      final eps = await _episodeRepo.getByContentId(contentId);
+      for (final ep in eps) {
+        if (ep.id != null) {
+          _ref.invalidate(watchProgressProvider(ep.id!));
+        }
+      }
+    }
   }
 }

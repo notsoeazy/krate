@@ -4,12 +4,14 @@ import 'package:krate/data/models/episode.dart';
 import 'package:krate/providers/providers.dart';
 
 class MediaDetailsEpisodeTile extends ConsumerWidget {
+  final int contentId;
   final Episode episode;
   final VoidCallback onPlay;
   final bool isCurrentlyPlaying;
 
   const MediaDetailsEpisodeTile({
     super.key,
+    required this.contentId,
     required this.episode,
     required this.onPlay,
     this.isCurrentlyPlaying = false,
@@ -19,6 +21,25 @@ class MediaDetailsEpisodeTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final progressAsync = ref.watch(watchProgressProvider(episode.id!));
+    final selectionState = ref.watch(watchedSelectionProvider(contentId));
+    final isSelected = selectionState.selectedEpisodeIds.contains(episode.id);
+
+    if (selectionState.isSelectionMode) {
+      return CheckboxListTile(
+        value: isSelected,
+        onChanged: (_) {
+          if (episode.id != null) {
+            ref
+                .read(watchedSelectionProvider(contentId).notifier)
+                .toggleSelection(episode.id!);
+          }
+        },
+        title: _buildEpisodeInfo(context, progressAsync, theme),
+        secondary: _buildEpisodeIndicator(context, progressAsync, theme),
+        controlAffinity: ListTileControlAffinity.trailing,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      );
+    }
 
     return ExpansionTile(
       key: PageStorageKey('episode_${episode.id}'),
@@ -56,11 +77,11 @@ class MediaDetailsEpisodeTile extends ConsumerWidget {
           child: Stack(
             children: [
               // Progress Bar Overlay
-              if (percentage > 0)
+              if (percentage > 0 || isFinished)
                 Align(
                   alignment: Alignment.bottomCenter,
                   child: FractionallySizedBox(
-                    heightFactor: percentage,
+                    heightFactor: isFinished ? 1.0 : percentage,
                     widthFactor: 1.0,
                     child: ColoredBox(
                       color: isFinished
@@ -155,7 +176,9 @@ class MediaDetailsEpisodeTile extends ConsumerWidget {
             return Text(
               parts.join(' • '),
               style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+                color: episode.hasFile
+                    ? theme.colorScheme.onSurfaceVariant
+                    : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
               ),
             );
           },

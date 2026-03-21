@@ -21,6 +21,40 @@ class ShellScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currentIndex = ref.watch(shellTabIndexProvider);
 
+    // Watch for vault changes detected during startup scan
+    final changesDetected = ref.watch(vaultChangesDetectedProvider);
+    if (changesDetected) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Reset immediately to prevent duplicate dialogs
+        ref.read(vaultChangesDetectedProvider.notifier).state = false;
+
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('Sync Required'),
+            content: const Text(
+              'Changes or an existing library were detected in your vault '
+              'directory. Sync now?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Later'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  ref.read(vaultSyncProvider.notifier).sync();
+                },
+                child: const Text('Sync Now'),
+              ),
+            ],
+          ),
+        );
+      });
+    }
+
     final destinations = [
       const _NavigationDestinationData(
         icon: Icons.home_outlined,
