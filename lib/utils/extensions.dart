@@ -13,4 +13,50 @@ extension StringX on String {
 
 extension DateTimeX on DateTime {
   int get year4 => year;
+
+  String toBackupFormat() {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+
+    final y = year;
+    final m = months[month - 1];
+    final d = day;
+    final h = hour.toString().padLeft(2, '0');
+    final min = minute.toString().padLeft(2, '0');
+    return '$h:$min • $m $d, $y';
+  }
+
+  String toHistoryFormat() {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+
+    final y = year;
+    final m = months[month - 1];
+    final d = day;
+    return '$m $d, $y';
+  }
 }

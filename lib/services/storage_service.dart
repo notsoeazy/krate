@@ -22,25 +22,38 @@ class StorageService {
 
   // Persists [path] as the storage root after verifying write access
   // and creating the vault folder structure.
-  Future<void> setRoot(String path) async {
+  Future<bool> setRoot(String path) async {
+    var rootPath = path;
+    // If the user selected the krate_vault folder itself, go up one level
+    final dir = Directory(path);
+    if (dir.path.split(Platform.pathSeparator).last == kVaultFolderName) {
+      rootPath = dir.parent.path;
+      debugPrint('[StorageService] Selected krate_vault, using parent: $rootPath');
+    }
+
     // Validate write permission
     final testFile = File(
-      '$path/.krate_permission_test_${DateTime.now().millisecondsSinceEpoch}',
+      '$rootPath/.krate_permission_test_${DateTime.now().millisecondsSinceEpoch}',
     );
     try {
-      // For testing only for errors
       await testFile.writeAsString('ok');
       await testFile.delete();
     } catch (_) {
-      throw VaultPermissionException(path);
+      throw VaultPermissionException(rootPath);
     }
+
+    // Check if vault already exists
+    final vaultDir = Directory('$rootPath/$kVaultFolderName');
+    final alreadyExists = await vaultDir.exists();
 
     // Persist the path
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_rootKey, path);
+    await prefs.setString(_rootKey, rootPath);
 
-    // Create the directory structure
-    await _ensureVaultStructure(path);
+    // Create/Ensure the directory structure
+    await _ensureVaultStructure(rootPath);
+
+    return alreadyExists;
   }
 
   Future<String?> getRoot() async {
@@ -57,10 +70,13 @@ class StorageService {
   // Called on every app launch to decide whether to show the main shell
   // or redirect to [StorageSetupScreen].
   Future<VaultStatus> checkIntegrity() async {
+    debugPrint('[StorageService] Checking vault integrity...');
     final root = await getRoot();
+    debugPrint('[StorageService] Root path: $root');
     if (root == null) return VaultStatus.rootMissing;
 
     if (Platform.isAndroid) {
+      debugPrint('[StorageService] Checking Android permissions...');
       if (!await Permission.storage.isGranted) {
         // On Android 11+, check for Manage External Storage
         if (!await Permission.manageExternalStorage.isGranted) {

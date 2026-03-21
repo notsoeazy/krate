@@ -4,6 +4,7 @@ import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/widgets/empty_state_view.dart';
 import 'package:krate/ui/screens/media_details/media_details_screen.dart';
 import 'package:krate/ui/screens/recents/components/recents_history_card.dart';
+import 'package:krate/utils/extensions.dart';
 
 class RecentsHistoryTab extends ConsumerWidget {
   const RecentsHistoryTab({super.key});
@@ -75,8 +76,7 @@ class _HistoryItem extends ConsumerWidget {
     if (finishedAtStr != null) {
       final dt = DateTime.tryParse(finishedAtStr);
       if (dt != null) {
-        dateText =
-            '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+        dateText = dt.toHistoryFormat();
       }
     }
 

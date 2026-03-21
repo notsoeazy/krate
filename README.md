@@ -65,7 +65,7 @@ To run Krate locally, ensure you have the [Flutter SDK](https://docs.flutter.dev
 
 <h2 align="center">✦ Status ✦</h2>
 
-> **Current Version:** v0.2.1-alpha  
+> **Current Version:** v0.3.0-alpha  
 > **Platform Support:** Exclusively developed and tested for **Android**. Other platforms (Linux, Windows) are currently not functional or supported, though support for these is planned for the future.
 > 
 > Krate is currently in active development. Core features for library management and playback are implemented, with further refinements planned for the beta release.

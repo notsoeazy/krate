@@ -24,10 +24,7 @@ class _StorageSetupScreenState extends ConsumerState<StorageSetupScreen> {
     try {
       if (Theme.of(context).platform == TargetPlatform.android) {
         // Request both simultaneously to handle older and newer Android versions
-        await [
-          Permission.storage,
-          Permission.manageExternalStorage,
-        ].request();
+        await [Permission.storage, Permission.manageExternalStorage].request();
 
         final storageGranted = await Permission.storage.isGranted;
         final manageGranted = await Permission.manageExternalStorage.isGranted;
@@ -61,7 +58,40 @@ class _StorageSetupScreenState extends ConsumerState<StorageSetupScreen> {
         return;
       }
 
-      await ref.read(storageServiceProvider).setRoot(path);
+      final alreadyExists = await ref
+          .read(storageServiceProvider)
+          .setRoot(path);
+
+      if (alreadyExists && mounted) {
+        final shouldSync = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('Existing Vault Found'),
+            content: const Text(
+              'A Krate vault already exists in this directory. Would you like to sync your library now?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Later'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Sync Now'),
+              ),
+            ],
+          ),
+        );
+
+        if (shouldSync == true && mounted) {
+          // Trigger sync in the background or show progress
+          // For now, we'll just start it and move on, or we could wait.
+          // Since it's initial setup, let's just trigger it.
+          ref.read(vaultSyncProvider.notifier).sync();
+        }
+      }
+
       ref.invalidate(vaultStatusProvider);
     } catch (e) {
       if (mounted) {

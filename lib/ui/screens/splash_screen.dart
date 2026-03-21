@@ -6,7 +6,8 @@ import 'package:krate/ui/screens/shell_screen.dart';
 import 'package:krate/ui/screens/storage_setup_screen.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
-  const SplashScreen({super.key});
+  final bool isInitial;
+  const SplashScreen({super.key, this.isInitial = false});
 
   @override
   ConsumerState<SplashScreen> createState() => _SplashScreenState();
@@ -49,6 +50,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   Future<void> _performStartup() async {
+    if (widget.isInitial) return;
+
     final startTime = DateTime.now();
 
     // Wait for vault status to be determined

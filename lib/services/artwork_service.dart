@@ -12,7 +12,7 @@ class ArtworkService {
     ),
   );
 
-  // Downloads poster and backdrop for [content] into [podPath].
+  // Downloads poster and backdrop for content into podPath.
   // Returns a record with the absolute paths to the saved files, or null
   // for each if the download failed or the path was not provided.
   Future<({String? posterPath, String? backdropPath})> downloadArtwork({

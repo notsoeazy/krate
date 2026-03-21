@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:krate/utils/constants.dart';
 
-/// Represents a single piece of media content (movie or series).
 class Content {
   final int? id;
   final int? tmdbId;
@@ -238,8 +237,12 @@ class Content {
       tmdbStatus: tmdbStatus ?? this.tmdbStatus,
       tmdbPosterPath: tmdbPosterPath ?? this.tmdbPosterPath,
       tmdbBackdropPath: tmdbBackdropPath ?? this.tmdbBackdropPath,
-      localPosterPath: clearLocalPosterPath ? null : (localPosterPath ?? this.localPosterPath),
-      localBackdropPath: clearLocalBackdropPath ? null : (localBackdropPath ?? this.localBackdropPath),
+      localPosterPath: clearLocalPosterPath
+          ? null
+          : (localPosterPath ?? this.localPosterPath),
+      localBackdropPath: clearLocalBackdropPath
+          ? null
+          : (localBackdropPath ?? this.localBackdropPath),
       podPath: podPath ?? this.podPath,
       isFavorite: isFavorite ?? this.isFavorite,
       fileStatus: fileStatus ?? this.fileStatus,

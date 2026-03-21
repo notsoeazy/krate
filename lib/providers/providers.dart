@@ -19,23 +19,18 @@ import 'package:krate/services/metadata_service.dart';
 import 'package:krate/services/storage_service.dart';
 import 'package:krate/services/tmdb_service.dart';
 import 'package:krate/services/vault_sync_service.dart';
+import 'package:krate/services/backup_service.dart';
 import 'package:krate/services/watch_progress_service.dart';
 import 'package:krate/utils/file_utils.dart';
 
-// UI State Providers
-// Which tab the Library screen should show: 0 = Home, 1 = Library, 2 = Recents, 3 = Settings.
-final shellTabIndexProvider = StateProvider<int>((ref) => 0);
-
-// Which tab the Library screen should show: 0 = Movies, 1 = Series.
-final libraryTabProvider = StateProvider<int>((ref) => 0);
-
-// Which tab the Recents screen should show: 0 = History, 1 = Watching, 2 = Completed.
-final recentsTabProvider = StateProvider<int>((ref) => 0);
-
-// Infrastructure singletons
-final storageServiceProvider = Provider<StorageService>(
-  (ref) => StorageService(),
-);
+// Tab providers (starts at 0)
+final shellTabIndexProvider = StateProvider<int>(
+  (ref) => 0,
+); // Home, Library, Recents, Settings.
+final libraryTabProvider = StateProvider<int>((ref) => 0); // Movies, Series.
+final recentsTabProvider = StateProvider<int>(
+  (ref) => 0,
+); // History, Watching, Completed.
 
 // Repositories
 final contentRepoProvider = Provider<ContentRepository>(
@@ -55,6 +50,10 @@ final watchHistoryRepoProvider = Provider<WatchHistoryRepository>(
 );
 
 // Services
+final storageServiceProvider = Provider<StorageService>(
+  (ref) => StorageService(),
+);
+
 final tmdbServiceProvider = Provider<TMDBService>((ref) => TMDBService());
 
 final artworkServiceProvider = Provider<ArtworkService>(
@@ -95,9 +94,18 @@ final watchProgressServiceProvider = Provider<WatchProgressService>((ref) {
   );
 });
 
+final backupServiceProvider = Provider<BackupService>((ref) {
+  return BackupService(ref.read(storageServiceProvider));
+});
+
 // Vault status (checked on startup)
 final vaultStatusProvider = FutureProvider<VaultStatus>((ref) {
   return ref.read(storageServiceProvider).checkIntegrity();
+});
+
+// Backup status
+final lastBackupTimeProvider = FutureProvider<DateTime?>((ref) async {
+  return ref.watch(backupServiceProvider).getLastBackupTime();
 });
 
 // Import Jobs globally managed list of in-flight/recent imports
@@ -139,15 +147,15 @@ class ImportJobsNotifier extends StateNotifier<List<ImportJob>> {
     _ref.invalidate(completedContentProvider);
   }
 
-  /// Invalidates episode + content providers for [contentId] so any watching
-  /// screen (MediaDetailsScreen, MediaManagementScreen) refreshes immediately.
+  // Invalidates episode + content providers for contentId so any watching
+  // screen (MediaDetailsScreen, MediaManagementScreen) refreshes immediately.
   void _invalidateContentData(int contentId) {
     _ref.invalidate(contentEpisodesProvider(contentId));
     _ref.invalidate(contentProvider(contentId));
     _ref.invalidate(resumeEpisodeProvider(contentId));
   }
 
-  /// Returns the number of currently active (queued or running) jobs.
+  // Returns the number of currently active (queued or running) jobs.
   int get activeCount => state.where((j) => j.isActive).length;
 
   Future<void> importMovie({
@@ -194,7 +202,7 @@ class ImportJobsNotifier extends StateNotifier<List<ImportJob>> {
       episodeSubtitles: episodeSubtitles,
       onUpdate: _update,
     );
-    // Invalidate so MediaDetailsScreen reflects the newly linked files immediately.
+    // Refresh UI
     if (content.id != null) _invalidateContentData(content.id!);
   }
 
@@ -395,19 +403,9 @@ final continueWatchingProvider = FutureProvider.autoDispose<List<Content>>((
 ) async {
   final contentList = await ref
       .read(watchProgressRepoProvider)
-      .getInProgressContent(limit: 10);
+      .getWatchingContent(limit: 10);
 
-  // Filter out content that is fully completed (no resume episode)
-  final results = await Future.wait(
-    contentList.map((c) async {
-      final resumeEpisode = await ref.watch(
-        resumeEpisodeProvider(c.id!).future,
-      );
-      return resumeEpisode != null ? c : null;
-    }),
-  );
-
-  return results.whereType<Content>().toList();
+  return contentList;
 });
 
 final watchHistoryListProvider =
@@ -418,38 +416,24 @@ final watchHistoryListProvider =
 final watchingContentProvider = FutureProvider.autoDispose<List<Content>>((
   ref,
 ) async {
-  // Reuse logic from continueWatchingProvider but without the limit of 10
   final contentList = await ref
       .read(watchProgressRepoProvider)
-      .getInProgressContent(limit: 50);
+      .getWatchingContent(limit: 50);
 
-  // Filter out content that is fully completed (no resume episode)
-  final results = await Future.wait(
-    contentList.map((c) async {
-      final resumeEpisode = await ref.watch(
-        resumeEpisodeProvider(c.id!).future,
-      );
-      return resumeEpisode != null ? c : null;
-    }),
-  );
-
-  return results.whereType<Content>().toList();
+  return contentList;
 });
 
 final completedContentProvider = FutureProvider.autoDispose<List<Content>>((
   ref,
 ) async {
-  final ids = await ref.read(watchHistoryRepoProvider).getCompletedContentIds();
-  final repo = ref.read(contentRepoProvider);
-  final List<Content> items = [];
-  for (final id in ids) {
-    final c = await repo.getById(id);
-    if (c != null) items.add(c);
-  }
-  return items;
+  final contentList = await ref
+      .read(watchProgressRepoProvider)
+      .getCompletedContent(limit: 50);
+
+  return contentList;
 });
 
-/// Watches a specific content item reactively.
+// Watches a specific content item reactively.
 final contentProvider = FutureProvider.family.autoDispose<Content?, int>((
   ref,
   id,
@@ -457,14 +441,14 @@ final contentProvider = FutureProvider.family.autoDispose<Content?, int>((
   return ref.read(contentRepoProvider).getById(id);
 });
 
-/// Watches a specific content item by its TMDB ID.
+// Watches a specific content item by its TMDB ID.
 final contentByTmdbIdProvider = FutureProvider.family
     .autoDispose<Content?, int>((ref, tmdbId) {
       return ref.read(contentRepoProvider).getByTmdbId(tmdbId);
     });
 
-/// Watches episodes for a content item. Not autoDispose — cached in memory so
-/// tab switching is instant. Explicitly invalidated after any mutation.
+// Watches episodes for a content item. Not autoDispose — cached in memory so
+// tab switching is instant.
 final contentEpisodesProvider = FutureProvider.family<List<Episode>, int>((
   ref,
   contentId,
@@ -472,8 +456,8 @@ final contentEpisodesProvider = FutureProvider.family<List<Episode>, int>((
   return ref.read(episodeRepoProvider).getByContentId(contentId);
 });
 
-/// Filters cached episodes for a single season. Not autoDispose — cached
-/// alongside contentEpisodesProvider and only refreshed after mutations.
+// Filters cached episodes for a single season. Not autoDispose — cached
+// alongside contentEpisodesProvider and only refreshed after mutations.
 final mergedEpisodesProvider =
     FutureProvider.family<List<Episode>, ({int contentId, int seasonNumber})>((
       ref,
@@ -485,7 +469,7 @@ final mergedEpisodesProvider =
       return all.where((e) => e.seasonNumber == arg.seasonNumber).toList();
     });
 
-/// Determines the best episode to resume for a given content item.
+// Determines the best episode to resume for a given content item.
 final resumeEpisodeProvider = FutureProvider.family.autoDispose<Episode?, int>((
   ref,
   contentId,
@@ -493,15 +477,15 @@ final resumeEpisodeProvider = FutureProvider.family.autoDispose<Episode?, int>((
   return ref.read(watchProgressServiceProvider).getResumeEpisode(contentId);
 });
 
-/// Watches progress for a specific episode.
+// Watches progress for a specific episode.
 final watchProgressProvider = FutureProvider.family
     .autoDispose<WatchProgress?, int>((ref, episodeId) {
       return ref.read(watchProgressRepoProvider).getByEpisodeId(episodeId);
     });
 
-/// Returns episode count info for a series used to render the progress badge
-/// on [MediaCard]. Derived from [contentEpisodesProvider].
-/// Record: {total: int, available: int}.
+// Returns episode count info for a series used to render the progress badge
+// on MediaCard. Derived from contentEpisodesProvider.
+// Record: {total: int, available: int}.
 final contentEpisodeCountProvider =
     FutureProvider.family<({int total, int available}), int>((
       ref,
@@ -512,26 +496,26 @@ final contentEpisodeCountProvider =
     });
 
 // Media Management per-screen scoped state
-/// The exclusive interaction mode of [MediaManagementScreen].
+// The exclusive interaction mode of MediaManagementScreen.
 enum ManagementMode {
-  /// Default — tap an episode icon to stage a file for import.
+  // Default — tap an episode icon to stage a file for import.
   importStaging,
 
-  /// Delete-checkbox mode — only episodes with media are selectable.
+  // Delete-checkbox mode — only episodes with media are selectable.
   deleteSelection,
 
-  /// A job is running; all user interaction is locked.
+  // A job is running; all user interaction is locked.
   jobRunning,
 }
 
-/// One staged import entry: an episode + the local file path chosen for it.
+// One staged import entry: an episode + the local file path chosen for it.
 @immutable
 class StagedFile {
   final int episodeId;
   final String? path;
   final List<String> subtitlePaths;
 
-  /// `true` when the episode already has a file — this will be a replace op.
+  // `true` when the episode already has a file — this will be a replace op.
   final bool isReplace;
 
   const StagedFile({
@@ -542,18 +526,18 @@ class StagedFile {
   });
 }
 
-/// Immutable state snapshot for [MediaManagementScreen].
+// Immutable state snapshot for MediaManagementScreen
 @immutable
 class MediaManagementState {
   final ManagementMode mode;
 
-  /// episodeId → staged file. Only populated in [ManagementMode.importStaging].
+  // episodeId → staged file. Only populated in ManagementMode.importStaging
   final Map<int, StagedFile> stagedFiles;
 
-  /// Episode IDs selected for deletion. Only populated in [ManagementMode.deleteSelection].
+  // Episode IDs selected for deletion. Only populated in ManagementMode.deleteSelection
   final Set<int> deleteSelections;
 
-  /// `true` while the OS file-picker dialog is open.
+  // `true` while the OS file-picker dialog is open.
   final bool isPickerOpen;
 
   const MediaManagementState({
@@ -567,13 +551,13 @@ class MediaManagementState {
   bool get hasJobRunning => mode == ManagementMode.jobRunning;
   bool get isDeleteMode => mode == ManagementMode.deleteSelection;
 
-  /// Scan is only allowed when idle with no files staged and picker closed.
+  // Scan is only allowed when idle with no files staged and picker closed.
   bool get canScan =>
       mode == ManagementMode.importStaging &&
       stagedFiles.isEmpty &&
       !isPickerOpen;
 
-  /// Switching to delete mode requires the same idle condition.
+  // Switching to delete mode requires the same idle condition.
   bool get canSwitchToDelete => canScan;
 
   bool get importButtonEnabled => stagedFiles.isNotEmpty && !hasJobRunning;
@@ -595,8 +579,8 @@ class MediaManagementState {
 class MediaManagementNotifier extends StateNotifier<MediaManagementState> {
   MediaManagementNotifier() : super(const MediaManagementState());
 
-  /// Picks both media (1 file) and subtitles (N files) in a single dialog.
-  /// Enforces exactly 1 video file and 0+ subtitle files.
+  // Picks both media (1 file) and subtitles (N files) in a single dialog.
+  // Enforces exactly 1 video file and 0+ subtitle files.
   Future<void> pickMediaWithSubtitles({
     required int episodeId,
     required bool episodeHasFile,
@@ -718,7 +702,7 @@ class MediaManagementNotifier extends StateNotifier<MediaManagementState> {
     state = state.copyWith(mode: ManagementMode.jobRunning);
   }
 
-  /// Resets to clean import-staging state after a foreground job finishes.
+  // Resets to clean import-staging state after a foreground job finishes.
   void markJobDone() {
     state = state.copyWith(
       mode: ManagementMode.importStaging,
@@ -728,7 +712,7 @@ class MediaManagementNotifier extends StateNotifier<MediaManagementState> {
   }
 }
 
-/// Scoped per content ID. Auto-disposed when the screen is popped.
+// Scoped per content ID. Auto-disposed when the screen is popped.
 final mediaManagementProvider = StateNotifierProvider.autoDispose
     .family<MediaManagementNotifier, MediaManagementState, int>(
       (ref, contentId) => MediaManagementNotifier(),

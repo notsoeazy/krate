@@ -21,6 +21,7 @@ class MediaDetailsEpisodeTile extends ConsumerWidget {
     final progressAsync = ref.watch(watchProgressProvider(episode.id!));
 
     return ExpansionTile(
+      key: PageStorageKey('episode_${episode.id}'),
       tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       shape: const Border(),
       collapsedShape: const Border(),

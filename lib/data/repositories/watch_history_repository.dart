@@ -36,9 +36,9 @@ class WatchHistoryRepository {
     }
   }
 
-  /// Returns all history rows joined with content info, newest first.
-  /// Groups by episodeId to ensure we only show the most recent watch session
-  /// for a given episode/movie, preventing duplicates in the UI.
+  // Returns all history rows joined with content info, newest first.
+  // Groups by episodeId to ensure we only show the most recent watch session
+  // for a given episode/movie, preventing duplicates in the UI.
   Future<List<Map<String, dynamic>>> getAll({int limit = 100}) async {
     final db = await _db.database;
     return db.rawQuery(
@@ -54,25 +54,6 @@ class WatchHistoryRepository {
       ''',
       [limit],
     );
-  }
-
-  /// Returns the list of content IDs that have been fully watched (all episodes finished)
-  Future<List<int>> getCompletedContentIds() async {
-    final db = await _db.database;
-    // A content is completed if ALL its episodes have isFinished = 1 in watch_progress.
-    // We join content with episodes and left join with watch_progress.
-    // If the count of episodes matches the count of finished progress entries, it's completed.
-    final rows = await db.rawQuery('''
-      SELECT c.id
-      FROM content c
-      JOIN episodes e ON e.contentId = c.id
-      LEFT JOIN watch_progress wp ON wp.episodeId = e.id
-      GROUP BY c.id
-      HAVING COUNT(e.id) > 0 
-         AND COUNT(CASE WHEN wp.isFinished = 1 THEN 1 END) = COUNT(e.id)
-      ORDER BY MAX(wp.lastWatchedAt) DESC
-      ''');
-    return rows.map((r) => r['id'] as int).toList();
   }
 
   Future<void> clearAll() async {

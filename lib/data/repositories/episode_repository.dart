@@ -107,7 +107,7 @@ class EpisodeRepository {
       whereArgs: [contentId],
       orderBy: 'seasonNumber ASC, episodeNumber ASC',
     );
-    
+
     final episodes = <Episode>[];
     for (final row in rows) {
       final subtitles = await getSubtitlesByEpisodeId(row['id'] as int);
@@ -179,7 +179,7 @@ class EpisodeRepository {
       orderBy: 'episodeNumber ASC',
       limit: 1,
     );
-    
+
     if (rows.isNotEmpty) {
       final id = rows.first['id'] as int;
       final subtitles = await getSubtitlesByEpisodeId(id);
@@ -194,7 +194,7 @@ class EpisodeRepository {
       orderBy: 'seasonNumber ASC, episodeNumber ASC',
       limit: 1,
     );
-    
+
     if (rows.isNotEmpty) {
       final id = rows.first['id'] as int;
       final subtitles = await getSubtitlesByEpisodeId(id);
@@ -218,8 +218,7 @@ class EpisodeRepository {
     );
   }
 
-  // --- Subtitle Methods ---
-
+  // Subtitle Methods
   Future<List<Subtitle>> getSubtitlesByEpisodeId(int episodeId) async {
     final db = await _db.database;
     final rows = await db.query(

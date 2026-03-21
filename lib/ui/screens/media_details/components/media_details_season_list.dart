@@ -37,7 +37,8 @@ class MediaDetailsSeasonList extends ConsumerWidget {
           );
         }
         return ListView.separated(
-          padding: const EdgeInsets.fromLTRB(0, 8, 0, 32),
+          key: PageStorageKey('season_$seasonNumber'),
+          padding: const EdgeInsets.fromLTRB(0, 8, 0, 16),
           itemCount: eps.length,
           separatorBuilder: (_, _) => const Divider(height: 1, indent: 72),
           itemBuilder: (context, index) {

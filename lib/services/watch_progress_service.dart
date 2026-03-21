@@ -48,15 +48,15 @@ class WatchProgressService {
           // If finished, try to find the next one
           final nextEp = await _episodeRepo.getNextEpisode(ep);
           if (nextEp != null) return nextEp;
-          
-          // If no next episode, this content is truly finished
-          return null;
+
+          // If no next episode, this content is finished.
+          // Fall back to the first episode so the play button stays (Restart)
+          return allEpisodes.first;
         }
       }
     }
 
     // If nothing in progress or no matches, find the next episode after the latest finished one
-    // (This handles cases where progress might have been cleared or synced)
     Episode? latestFinished;
     for (final ep in allEpisodes) {
       final progress = await _progressRepo.getByEpisodeId(ep.id!);
@@ -69,7 +69,7 @@ class WatchProgressService {
 
     if (latestFinished != null) {
       final nextEp = await _episodeRepo.getNextEpisode(latestFinished);
-      return nextEp; // Can be null if it was the last episode
+      if (nextEp != null) return nextEp;
     }
 
     // Default to the first available ready episode if possible, otherwise first metadata
@@ -86,7 +86,7 @@ class WatchProgressService {
     if (durationMs <= 0) return;
 
     final percentage = positionMs / durationMs;
-    final isFinished = percentage > 0.9; // 90% threshold for finished
+    final isFinished = percentage > kFinishedThreshold;
 
     final progress = WatchProgress(
       contentId: contentId,

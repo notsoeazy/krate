@@ -44,18 +44,54 @@ class WatchProgressRepository {
     );
   }
 
-  // Returns [Content] objects with in-progress episodes, joined with
-  // basic watch info for display in the Continue Watching row.
-  Future<List<Content>> getInProgressContent({int limit = 10}) async {
+  // Returns content that is currently being watched but is NOT fully completed.
+  // Movies: Have watch progress but not finished.
+  // Series: Have at least one finished or in-progress episode, but total finished < totalEpisodes.
+  Future<List<Content>> getWatchingContent({int limit = 20}) async {
     final db = await _db.database;
     final rows = await db.rawQuery(
       '''
       SELECT c.*
-      FROM watch_progress wp
-      JOIN content c ON c.id = wp.contentId
-      WHERE wp.positionMs > 0
-      GROUP BY c.id
-      ORDER BY MAX(wp.lastWatchedAt) DESC
+      FROM content c
+      WHERE c.id IN (
+        SELECT contentId FROM watch_progress 
+        WHERE isFinished = 0 AND positionMs > 0 AND contentId IN (SELECT id FROM content WHERE contentType = 'movie')
+
+        UNION
+
+        SELECT contentId FROM watch_progress wp
+        JOIN content c2 ON c2.id = wp.contentId
+        WHERE c2.contentType = 'series'
+        GROUP BY c2.id
+        HAVING SUM(wp.isFinished) < c2.totalEpisodes AND SUM(wp.positionMs) > 0
+      )
+      ORDER BY (SELECT MAX(lastWatchedAt) FROM watch_progress WHERE contentId = c.id) DESC
+      LIMIT ?
+      ''',
+      [limit],
+    );
+    return rows.map(Content.fromMap).toList();
+  }
+
+  // Returns fully completed content.
+  // Movies: The only episode is finished.
+  // Series: Count of finished episodes >= totalEpisodes metadata.
+  Future<List<Content>> getCompletedContent({int limit = 50}) async {
+    final db = await _db.database;
+    final rows = await db.rawQuery(
+      '''
+      SELECT c.*
+      FROM content c
+      WHERE (
+        (c.contentType = 'movie' AND EXISTS (
+          SELECT 1 FROM watch_progress wp WHERE wp.contentId = c.id AND wp.isFinished = 1
+        ))
+        OR
+        (c.contentType = 'series' AND (
+          SELECT SUM(isFinished) FROM watch_progress WHERE contentId = c.id
+        ) >= c.totalEpisodes AND c.totalEpisodes > 0)
+      )
+      ORDER BY (SELECT MAX(lastWatchedAt) FROM watch_progress WHERE contentId = c.id) DESC
       LIMIT ?
       ''',
       [limit],

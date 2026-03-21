@@ -18,9 +18,8 @@ class AppDatabase {
 
     return openDatabase(
       path,
-      version: 2,
+      version: 1,
       onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
       onOpen: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
@@ -105,7 +104,7 @@ class AppDatabase {
       )
     ''');
 
-    // Watch history for viewing sessions
+    // Watch history
     await db.execute('''
       CREATE TABLE watch_history (
         id                INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -135,18 +134,64 @@ class AppDatabase {
     );
   }
 
-  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      // Add subtitles table
-      await db.execute('''
-        CREATE TABLE subtitles (
-          id        INTEGER PRIMARY KEY AUTOINCREMENT,
-          episodeId INTEGER NOT NULL,
-          path      TEXT    NOT NULL,
-          name      TEXT    NOT NULL,
-          FOREIGN KEY (episodeId) REFERENCES episodes(id) ON DELETE CASCADE
-        )
-      ''');
+  // Backup & Restore
+  Future<Map<String, List<Map<String, dynamic>>>> exportAllTables() async {
+    final db = await database;
+    final tables = [
+      'content',
+      'episodes',
+      'subtitles',
+      'watch_progress',
+      'watch_history',
+    ];
+
+    final Map<String, List<Map<String, dynamic>>> export = {};
+
+    for (final table in tables) {
+      export[table] = await db.query(table);
     }
+
+    return export;
+  }
+
+  // *This clears the table
+  Future<void> restoreAllTables(Map<String, dynamic> data) async {
+    final db = await database;
+
+    await db.transaction((txn) async {
+      await txn.execute('PRAGMA foreign_keys = OFF'); // This is needed
+
+      final tables = [
+        'watch_history',
+        'watch_progress',
+        'subtitles',
+        'episodes',
+        'content',
+      ];
+
+      for (final table in tables) {
+        await txn.delete(table);
+      }
+
+      // Re-insert data in correct order (content first, then dependencies)
+      final insertOrder = [
+        'content',
+        'episodes',
+        'subtitles',
+        'watch_progress',
+        'watch_history',
+      ];
+
+      for (final table in insertOrder) {
+        final rows = data[table] as List?;
+        if (rows != null) {
+          for (final row in rows) {
+            await txn.insert(table, row as Map<String, dynamic>);
+          }
+        }
+      }
+
+      await txn.execute('PRAGMA foreign_keys = ON');
+    });
   }
 }
