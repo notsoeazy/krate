@@ -45,6 +45,15 @@ The application is built for portability, allowing you to plug in media "pods" a
 ---
 
 <h2 align="center">✦ Installation ✦</h2>
+<br>
+
+### Download the App
+
+The easiest way to get Krate is to download the latest APK from the [Releases](https://github.com/notsoeazy/krate/releases) page.
+
+---
+
+### Run Locally (Developers)
 
 To run Krate locally, ensure you have the [Flutter SDK](https://docs.flutter.dev/get-started/install) installed.
 
@@ -69,7 +78,7 @@ To run Krate locally, ensure you have the [Flutter SDK](https://docs.flutter.dev
 
 > **Current Version:** v0.4.0-alpha  
 > **Platform Support:** Exclusively developed and tested for **Android**. Other platforms (Linux, Windows) are currently not functional or supported, though support for these is planned for the future.
-> 
+>
 > Krate is currently in active development. Core features for library management and playback are implemented, with further refinements planned for the beta release.
 
 ---
