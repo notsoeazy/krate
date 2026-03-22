@@ -3,12 +3,15 @@ name: Release APK
 on:
   push:
     tags:
-      - 'v*' # Trigger on tags like v1.0.0, v0.4.0-alpha, etc.
+      - "v*" # Trigger on tags like v1.0.0, v0.4.0-alpha, etc.
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (optional, defaults to pubspec.yaml)'
+        description: "Version to release (optional, defaults to pubspec.yaml)"
         required: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 permissions:
   contents: write # Needed to create a release
@@ -25,13 +28,13 @@ jobs:
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: "temurin"
+          java-version: "17"
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: "stable"
           cache: true
 
       - name: Install Dependencies
@@ -47,13 +50,13 @@ jobs:
           if [ -z "$VERSION" ]; then
             VERSION=$(grep 'version: ' pubspec.yaml | sed 's/version: //')
           fi
-          
+
           # Clean version string (remove everything after + for filenames)
           CLEAN_VERSION=$(echo $VERSION | cut -d'+' -f1)
-          
+
           # Rename for final release
           mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/krate_${CLEAN_VERSION}.apk
-          
+
           # Export to environment for next steps
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
           echo "CLEAN_VERSION=${CLEAN_VERSION}" >> $GITHUB_ENV
@@ -63,9 +66,9 @@ jobs:
         with:
           files: build/app/outputs/flutter-apk/krate_${{ env.CLEAN_VERSION }}.apk
           tag_name: v${{ env.VERSION }}
-          name: Release v${{ env.VERSION }}
+          name: Krate v${{ env.VERSION }}
           draft: false
-          prerelease: false
+          prerelease: true
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
