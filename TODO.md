@@ -4,15 +4,16 @@
 
 1.  **Import Rework**: Auto-search by filename and dedicated import screen.
 
-## 🧪 CI & Quality Control
+## 🚀 Release & Versioning
 
-- [x] Setup GitHub Actions for CI (linting check)
-- [ ] Publish first alpha release (Manual)
+- [x] Setup GitHub Actions for automated APK releases (with Secrets)
+- [ ] Publish first alpha release (v0.4.0)
 
 ### How to Release:
-1.  **Build Locally**: `flutter build apk --release`.
-2.  **Tag Release**: `git tag v0.4.0 && git push origin v0.4.0`.
-3.  **Manual Release**: Upload the APK to a new GitHub Release via the website.
+1.  **Prep Secrets**: Ensure GitHub Secret `ENV_CONTENT` is set.
+2.  **Bump Version**: Update `version` in `pubspec.yaml` (e.g., `0.4.0+1`).
+3.  **Tag Release**: `git tag v0.4.0 && git push origin v0.4.0`.
+4.  **Manual Trigger**: Go to Actions -> Release APK -> Run workflow -> Enter version.
 
 ## Phase 1: Core Localization & Stabilization 🛠️
 

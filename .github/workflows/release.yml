@@ -1,0 +1,70 @@
+name: Release APK
+
+on:
+  push:
+    tags:
+      - "v*" # Trigger on tags like v0.4.0
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (optional, defaults to pubspec.yaml)"
+        required: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Inject Secrets into .env
+        run: echo "TMDB_API_KEY=${{ secrets.TMDB_API_KEY }}" > .env
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Prepare APK Asset
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if [ -z "$VERSION" ]; then
+            VERSION=$(grep 'version: ' pubspec.yaml | sed 's/version: //')
+          fi
+          CLEAN_VERSION=$(echo $VERSION | cut -d'+' -f1)
+          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/krate_${CLEAN_VERSION}.apk
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "CLEAN_VERSION=${CLEAN_VERSION}" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/app/outputs/flutter-apk/krate_${{ env.CLEAN_VERSION }}.apk
+          tag_name: v${{ env.VERSION }}
+          name: Krate v${{ env.VERSION }}
+          draft: false
+          prerelease: true
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
