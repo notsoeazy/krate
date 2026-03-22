@@ -28,5 +28,8 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
+      - name: Create Dummy .env
+        run: touch .env # Required because .env is listed as an asset in pubspec.yaml
+
       - name: Run Analysis
         run: flutter analyze
