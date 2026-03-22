@@ -327,30 +327,40 @@ After a series is already scouted (metadata exists, artwork downloaded), the use
 
 `ImportService.deleteEpisodesBatch(content, episodes)`:
 
-- Iterates the episode list, deleting each file and clearing each DB row.
+- Iterates the episode list, deleting each video file and **all physically linked subtitle files** from disk.
+- Clears the DB records (`videoPath = null`, `subtitles = []`) to prevent false alerts.
 - One final `_syncContentStatus()` + `MetadataService.scribe()` call after all deletions.
 
 ---
 
 ## Scanner / Reconciliation Flow
 
-**Service:** `ScannerService.scan()`
+**Service:** `VaultSyncService`
 
-Triggered manually by the user (e.g., a "Sync Vault" action). Used to reconcile the filesystem with the database — useful after manually moving files or recovering from a lost database.
+Triggered manually by the user via "Sync Vault" or automatically during startup via `scout()`. This system keeps the physical filesystem and the SQLite database perfectly aligned.
+
+### Automatic Scouting (`scout()`)
+Runs on app startup to cleanly detect discrepancies without doing a heavy resync:
+1. Compares disk directories (`Movies`, `Series`) against `dbTrackedIds`. Identifies entirely new untracked content dumped by the user.
+2. Checks all DB items. If a `ready` episode or movie is missing its video file or subtitle, it flags a sync.
+3. Deep-scans tracked pod directories for newly dropped `.mp4`/`.mkv` or `.srt` files that the DB does not know about.
+*If `scout()` returns true, the UI prompts the user to run a full Vault Sync.*
+
+### Full Sync (`sync()`)
 
 ```
 [1] Walk <vault>/movies/ and <vault>/series/ to collect all pod directories
 [2] For each pod directory:
         Check for .metadata.json — skip if missing
-        MetadataService.read()         → reconstruct Content + Episode list from JSON
-        ContentRepository.getByTmdbId → check if already in DB
+        MetadataService.read()         → reconstruct Content + Episode from JSON
+        Link / Reconcile Subtitles     → Scans pod for existing/new subtitle files
         ContentRepository.upsert()     → preserve isFavorite & createdAt; update rest
-        EpisodeRepository.upsert()     → add or update each episode row
-[3] Compare all Content.tmdbId values in DB against found tmdbIds on disk
-        Any DB entry not found on disk → flagged (ghost detection — pod directory missing)
+        EpisodeRepository.upsert()     → update episodes preserving local status
+[3] Compare all Content.tmdbId in DB against found tmdbIds on disk
+        Any DB entry not found on disk → flagged as missing (ghost)
 ```
 
-**Ghost Records:** A content item whose pod directory no longer exists on disk. Its `fileStatus` is `'missing'` and the UI can surface a badge indicating the physical files are gone.
+**Ghost Records:** A content item whose pod directory no longer exists on disk. Its `fileStatus` is `'missing'` and the UI handles this via dynamic corner badges (checkmarks or error-blocks) representing file availability.
 
 ---
 

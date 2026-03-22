@@ -360,7 +360,7 @@ class VaultSyncNotifier
         status: s,
       ),
     );
-    state = (isSyncing: false, progress: 1.0, status: 'Sync complete');
+    state = (isSyncing: true, progress: 1.0, status: 'Sync complete');
 
     // Evict cached images so that updated posters/backdrops reflect
     imageCache.clear();
@@ -377,13 +377,16 @@ class VaultSyncNotifier
     _ref.invalidate(contentEpisodeCountProvider);
     _ref.invalidate(mergedEpisodesProvider);
     _ref.invalidate(resumeEpisodeProvider);
+
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) state = (isSyncing: false, progress: 1.0, status: '');
   }
 
   Future<void> syncPod(String podPath, int contentId) async {
     if (state.isSyncing) return;
     state = (isSyncing: true, progress: 0.0, status: 'Syncing vault...');
     await _service.syncPod(Directory(podPath));
-    state = (isSyncing: false, progress: 1.0, status: 'Sync complete');
+    state = (isSyncing: true, progress: 1.0, status: 'Sync complete');
 
     // Evict cached images
     imageCache.clear();
@@ -402,6 +405,9 @@ class VaultSyncNotifier
     _ref.invalidate(recentSeriesProvider);
     _ref.invalidate(continueWatchingProvider);
     _ref.invalidate(mergedEpisodesProvider);
+
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) state = (isSyncing: false, progress: 1.0, status: '');
   }
 
   /// TODO: Make sure to remove this when done testing for toast,modals, etc

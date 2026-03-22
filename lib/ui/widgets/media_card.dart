@@ -7,7 +7,7 @@ import 'package:krate/data/models/content.dart';
 import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/screens/media_details/media_management_screen.dart';
 import 'package:krate/ui/widgets/confirmation_dialog.dart';
-import 'package:krate/ui/widgets/unavailable_overlay.dart';
+import 'package:krate/utils/feedback_utils.dart';
 
 class MediaCard extends ConsumerWidget {
   final Content content;
@@ -33,11 +33,6 @@ class MediaCard extends ConsumerWidget {
         ? ref.watch(contentEpisodeCountProvider(content.id!))
         : null;
 
-    final isUnavailable = isSeries
-        ? (episodeCountAsync?.valueOrNull?.available ?? 0) == 0 &&
-              (episodeCountAsync?.valueOrNull?.total ?? 0) > 0
-        : content.fileStatus == FileStatus.missing;
-
     return SizedBox(
       width: width,
       child: InkWell(
@@ -56,11 +51,10 @@ class MediaCard extends ConsumerWidget {
                     child: Card(
                       margin: EdgeInsets.zero,
                       clipBehavior: Clip.antiAlias,
-                      child: UnavailableOverlay(
-                        isUnavailable: isUnavailable,
-                        borderRadius: 12,
-                        child: _buildImage(context),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                      child: _buildImage(context),
                     ),
                   ),
                   // Favorite badge (top-left)
@@ -149,33 +143,48 @@ class MediaCard extends ConsumerWidget {
     bool isSeries,
     AsyncValue<({int total, int available})>? episodeCountAsync,
   ) {
-    // Missing file (movie or series)
-    if (content.fileStatus == FileStatus.missing) {
+    if (!isSeries) {
+      final isAvailable = content.fileStatus == FileStatus.ready;
       return _BadgeChip(
-        icon: Icons.block_outlined,
-        color: theme.colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.85,
-        ),
-        onColor: theme.colorScheme.onSurfaceVariant,
+        icon: isAvailable ? Icons.check_rounded : Icons.block_outlined,
+        color: isAvailable
+            ? theme.colorScheme.tertiaryContainer
+            : theme.colorScheme.error,
+        onColor: isAvailable
+            ? theme.colorScheme.onTertiaryContainer
+            : theme.colorScheme.onError,
       );
     }
 
-    // Series episode count badge
     if (isSeries && episodeCountAsync != null) {
       return episodeCountAsync.when(
         data: (counts) {
           if (counts.total == 0) return const SizedBox.shrink();
           final isCompleted = counts.available >= counts.total;
+          final isUnavailable = counts.available == 0;
+
+          if (isUnavailable) {
+            return _BadgeChip(
+              icon: Icons.block_outlined,
+              color: theme.colorScheme.error,
+              onColor: theme.colorScheme.onError,
+            );
+          }
+
+          if (isCompleted) {
+            return _BadgeChip(
+              icon: Icons.check_rounded,
+              color: theme.colorScheme.tertiaryContainer,
+              onColor: theme.colorScheme.onTertiaryContainer,
+            );
+          }
+
           return _BadgeChip(
-            label: isCompleted ? '✓' : '${counts.available}/${counts.total}',
-            color: isCompleted
-                ? theme.colorScheme.tertiaryContainer
-                : theme.colorScheme.surfaceContainerHighest.withValues(
-                    alpha: 0.9,
-                  ),
-            onColor: isCompleted
-                ? theme.colorScheme.onTertiaryContainer
-                : theme.colorScheme.onSurfaceVariant,
+            label: '${counts.available}/${counts.total}',
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.9,
+            ),
+            onColor: theme.colorScheme.onSurfaceVariant,
           );
         },
         loading: () => const SizedBox.shrink(),
@@ -245,7 +254,7 @@ class MediaCard extends ConsumerWidget {
       isScrollControlled: true,
       showDragHandle: true,
       useSafeArea: true,
-      builder: (context) => Padding(
+      builder: (sheetContext) => Padding(
         padding: EdgeInsets.only(bottom: 16),
         child: SingleChildScrollView(
           child: Column(
@@ -268,7 +277,7 @@ class MediaCard extends ConsumerWidget {
                   leading: const Icon(Icons.done_all_rounded),
                   title: const Text('Mark as watched'),
                   onTap: () async {
-                    Navigator.pop(context);
+                    Navigator.pop(sheetContext);
                     final confirmed = await ConfirmationDialog.show(
                       context,
                       title: 'Mark as watched?',
@@ -276,14 +285,20 @@ class MediaCard extends ConsumerWidget {
                           'Mark "${content.title}" and all its episodes as watched?',
                     );
                     if (confirmed) {
-                      await service.markSeasonFinished(content.id!, 0);
+                      final snapshot = await service.markSeasonFinished(
+                        content.id!,
+                        0,
+                      );
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Marked "${content.title}" as watched',
-                            ),
-                          ),
+                        FeedbackUtils.showUndoSnackBar(
+                          context,
+                          'Marked "${content.title}" as watched',
+                          () async {
+                            await service.restoreSnapshot(
+                              content.id!,
+                              snapshot,
+                            );
+                          },
                         );
                       }
                     }
@@ -293,7 +308,7 @@ class MediaCard extends ConsumerWidget {
                 leading: const Icon(Icons.history_rounded),
                 title: const Text('Clear watch history'),
                 onTap: () async {
-                  Navigator.pop(context);
+                  Navigator.pop(sheetContext);
                   final confirmed = await ConfirmationDialog.show(
                     context,
                     title: 'Clear watch history?',
@@ -303,14 +318,16 @@ class MediaCard extends ConsumerWidget {
                     isDestructive: true,
                   );
                   if (confirmed) {
-                    await service.clearSeriesProgress(content.id!);
+                    final snapshot = await service.clearSeriesProgress(
+                      content.id!,
+                    );
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Cleared history for "${content.title}"',
-                          ),
-                        ),
+                      FeedbackUtils.showUndoSnackBar(
+                        context,
+                        'Cleared history for "${content.title}"',
+                        () async {
+                          await service.restoreSnapshot(content.id!, snapshot);
+                        },
                       );
                     }
                   }
@@ -397,7 +414,7 @@ class _BadgeChip extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
         child: icon != null
-            ? Icon(icon, size: 11, color: onColor)
+            ? Icon(icon, size: 13, color: onColor)
             : Text(label!, style: textStyle),
       ),
     );

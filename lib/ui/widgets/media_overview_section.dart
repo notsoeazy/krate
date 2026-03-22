@@ -26,7 +26,7 @@ class MediaOverviewSection extends StatelessWidget {
           style: theme.textTheme.bodyMedium,
         ),
         if (content.genres != null && content.genres!.isNotEmpty) ...[
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           _GenreChips(genres: content.genres!),
         ],
       ],

@@ -15,6 +15,8 @@ import 'package:krate/ui/screens/media_details/components/media_details_season_s
 import 'package:krate/ui/widgets/confirmation_dialog.dart';
 import 'package:krate/ui/widgets/media_info_row.dart';
 import 'package:krate/ui/widgets/media_overview_section.dart';
+import 'package:krate/utils/errors.dart';
+import 'package:krate/utils/feedback_utils.dart';
 
 // Max expanded height of the backdrop
 const double _kExpandedHeight = 340.0;
@@ -93,11 +95,27 @@ class _MediaDetailsScaffoldState extends ConsumerState<_MediaDetailsScaffold>
         } else {
           await notifier.fetchMetadataMovie(service: service, content: content);
         }
-      } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(
+          FeedbackUtils.showSuccessSnackBar(
             context,
-          ).showSnackBar(SnackBar(content: Text(e.toString())));
+            'Metadata updated successfully',
+          );
+        }
+      } catch (e) {
+        debugPrint('[MediaDetailsScreen] Fetch Metadata Error: $e');
+        if (context.mounted) {
+          if (e is NoInternetException) {
+            FeedbackUtils.showErrorSnackBar(
+              context,
+              'No internet connection. Cannot connect to TMDB.',
+            );
+          } else {
+            FeedbackUtils.showErrorSnackBar(
+              context,
+              'Failed to fetch metadata',
+              error: e,
+            );
+          }
         }
       }
     }
@@ -108,11 +126,27 @@ class _MediaDetailsScaffoldState extends ConsumerState<_MediaDetailsScaffold>
         await ref
             .read(vaultSyncProvider.notifier)
             .syncPod(content.podPath!, content.id!);
-      } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(
+          FeedbackUtils.showSuccessSnackBar(
             context,
-          ).showSnackBar(SnackBar(content: Text(e.toString())));
+            'Vault synced successfully',
+          );
+        }
+      } catch (e) {
+        debugPrint('[MediaDetailsScreen] Vault Sync Error: $e');
+        if (context.mounted) {
+          if (e is NoInternetException) {
+            FeedbackUtils.showErrorSnackBar(
+              context,
+              'No internet connection. Cannot connect to TMDB.',
+            );
+          } else {
+            FeedbackUtils.showErrorSnackBar(
+              context,
+              'Vault sync failed',
+              error: e,
+            );
+          }
         }
       }
     }
@@ -203,7 +237,6 @@ class _MediaDetailsScaffoldState extends ConsumerState<_MediaDetailsScaffold>
   }
 }
 
-
 class _MediaDetailsAppBar extends ConsumerWidget {
   final Content content;
   final VoidCallback onVaultSync;
@@ -268,9 +301,17 @@ class _MediaDetailsAppBar extends ConsumerWidget {
               MediaDetailsSeasonSelectionModal.show(context, content),
           onMarkFinished: () async {
             if (content.contentType == ContentType.movie) {
-              await ref
-                  .read(watchProgressServiceProvider)
-                  .markSeasonFinished(content.id!, 0);
+              final service = ref.read(watchProgressServiceProvider);
+              final snapshot = await service.markSeasonFinished(content.id!, 0);
+              if (context.mounted) {
+                FeedbackUtils.showUndoSnackBar(
+                  context,
+                  'Marked "${content.title}" as watched',
+                  () async {
+                    await service.restoreSnapshot(content.id!, snapshot);
+                  },
+                );
+              }
             }
           },
           onClearSeriesProgress: () async {
@@ -283,9 +324,17 @@ class _MediaDetailsAppBar extends ConsumerWidget {
               isDestructive: true,
             );
             if (confirmed) {
-              await ref
-                  .read(watchProgressServiceProvider)
-                  .clearSeriesProgress(content.id!);
+              final service = ref.read(watchProgressServiceProvider);
+              final snapshot = await service.clearSeriesProgress(content.id!);
+              if (context.mounted) {
+                FeedbackUtils.showUndoSnackBar(
+                  context,
+                  'Cleared history for "${content.title}"',
+                  () async {
+                    await service.restoreSnapshot(content.id!, snapshot);
+                  },
+                );
+              }
             }
           },
         ),
@@ -425,7 +474,7 @@ class _MediaDetailsActionRow extends ConsumerWidget {
                       height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(Icons.play_arrow_rounded),
+                  : const Icon(Icons.play_arrow_rounded, size: 28),
               label: Text(
                 label,
                 style: const TextStyle(fontWeight: FontWeight.bold),
@@ -438,7 +487,8 @@ class _MediaDetailsActionRow extends ConsumerWidget {
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
+          // Favorite Toggle
           SizedBox(
             width: rowHeight,
             height: rowHeight,
@@ -459,7 +509,6 @@ class _MediaDetailsActionRow extends ConsumerWidget {
               style: FilledButton.styleFrom(
                 padding: EdgeInsets.zero,
                 shape: const CircleBorder(),
-                minimumSize: Size(rowHeight, rowHeight),
               ),
               child: Icon(
                 content?.isFavorite == true
@@ -468,7 +517,7 @@ class _MediaDetailsActionRow extends ConsumerWidget {
                 color: content?.isFavorite == true
                     ? theme.colorScheme.error
                     : null,
-                size: 22,
+                size: 24,
               ),
             ),
           ),

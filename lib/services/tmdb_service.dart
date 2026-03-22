@@ -1,12 +1,11 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:krate/utils/errors.dart';
 
 class TMDBService {
   static const _base = 'https://api.themoviedb.org/3';
-
+  
   String get _apiKey => dotenv.env['TMDB_API_KEY'] ?? '';
 
   // Search
@@ -48,7 +47,8 @@ class TMDBService {
   // Private HTTP helpers
   Future<Map<String, dynamic>> _get(String url) async {
     try {
-      final response = await http.get(Uri.parse(url));
+      final uri = Uri.parse(url);
+      final response = await http.get(uri);
       if (response.statusCode != 200) {
         throw TmdbApiException('HTTP ${response.statusCode} for $url');
       }
@@ -56,22 +56,36 @@ class TMDBService {
     } on TmdbApiException {
       rethrow;
     } catch (e) {
-      throw TmdbApiException('$e');
+      final eStr = e.toString().toLowerCase();
+      if (eStr.contains('socket') || eStr.contains('network') || eStr.contains('connection') || eStr.contains('failed host lookup')) {
+        throw const NoInternetException();
+      } else if (eStr.contains('timeout')) {
+        throw const TmdbApiException('The request timed out. Please try again later.');
+      }
+      throw const TmdbApiException('An unexpected network error occurred.');
     }
   }
 
   Future<List<Map<String, dynamic>>> _getList(String url) async {
     try {
-      final response = await http.get(Uri.parse(url));
+      final uri = Uri.parse(url);
+      final response = await http.get(uri);
       if (response.statusCode != 200) {
         throw TmdbApiException('HTTP ${response.statusCode}');
       }
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       final results = body['results'] as List? ?? [];
       return results.cast<Map<String, dynamic>>();
+    } on TmdbApiException {
+      rethrow;
     } catch (e) {
-      debugPrint('[TMDBService] Error: $e');
-      return [];
+      final eStr = e.toString().toLowerCase();
+      if (eStr.contains('socket') || eStr.contains('network') || eStr.contains('connection') || eStr.contains('failed host lookup')) {
+        throw const NoInternetException();
+      } else if (eStr.contains('timeout')) {
+        throw const TmdbApiException('The request timed out. Please try again later.');
+      }
+      throw const TmdbApiException('An unexpected network error occurred.');
     }
   }
 }

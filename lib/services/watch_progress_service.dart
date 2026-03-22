@@ -135,19 +135,21 @@ class WatchProgressService {
     _invalidateContent(contentId, episodeIds: episodeIds);
   }
 
-  Future<void> markSeasonFinished(int contentId, int seasonNumber) async {
-    await markSeasonsFinished(contentId, [seasonNumber]);
+  Future<List<WatchProgress>> markSeasonFinished(int contentId, int seasonNumber) async {
+    return await markSeasonsFinished(contentId, [seasonNumber]);
   }
 
-  Future<void> markSeasonsFinished(
+  Future<List<WatchProgress>> markSeasonsFinished(
     int contentId,
     List<int> seasonNumbers,
   ) async {
     debugPrint(
       '[WatchProgressService] Marking seasons $seasonNumbers as finished for content $contentId',
     );
+    final snapshot = await _progressRepo.getProgressForContent(contentId);
     await _progressRepo.markSeasonsFinished(contentId, seasonNumbers);
     _invalidateContent(contentId);
+    return snapshot;
   }
 
   Future<void> clearSeasonsProgress(
@@ -161,12 +163,21 @@ class WatchProgressService {
     _invalidateContent(contentId);
   }
 
-  Future<void> clearSeriesProgress(int contentId) async {
+  Future<List<WatchProgress>> clearSeriesProgress(int contentId) async {
     debugPrint(
       '[WatchProgressService] Clearing ALL progress and history for content $contentId',
     );
+    final snapshot = await _progressRepo.getProgressForContent(contentId);
     await _progressRepo.clearSeriesProgress(contentId);
     await _historyRepo.deleteByContentId(contentId);
+    _invalidateContent(contentId);
+    return snapshot;
+  }
+
+  Future<void> restoreSnapshot(int contentId, List<WatchProgress> snapshot) async {
+    debugPrint('[WatchProgressService] Restoring progress snapshot for content $contentId');
+    await _progressRepo.clearSeriesProgress(contentId); // Clear any new progress before restoring old
+    await _progressRepo.restoreProgress(snapshot);
     _invalidateContent(contentId);
   }
 

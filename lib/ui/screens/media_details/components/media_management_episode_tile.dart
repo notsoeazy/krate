@@ -32,15 +32,16 @@ class MediaManagementEpisodeTile extends StatelessWidget {
 
     // Delete Mode
     if (mode == ManagedTileMode.delete) {
+      final canDelete = episode.hasFile || episode.subtitles.isNotEmpty;
       return CheckboxListTile(
         value: isSelected,
-        onChanged: episode.hasFile ? onSelectedChanged : null,
-        enabled: episode.hasFile,
+        onChanged: canDelete ? onSelectedChanged : null,
+        enabled: canDelete,
         title: Text(
           episode.title ?? 'Episode ${episode.episodeNumber}',
           style: theme.textTheme.bodyLarge?.copyWith(
             fontWeight: FontWeight.w600,
-            color: episode.hasFile
+            color: canDelete
                 ? null
                 : theme.colorScheme.onSurface.withValues(alpha: 0.38),
           ),
@@ -119,11 +120,11 @@ class MediaManagementEpisodeTile extends StatelessWidget {
       children: [
         _buildSubtitle(theme)!,
         if (_hasSubtitles) ...[
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           Row(
             children: [
               const Icon(Icons.subtitles, size: 12, color: Colors.grey),
-              const SizedBox(width: 4),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   _formatSubtitleList(
@@ -177,7 +178,7 @@ class MediaManagementEpisodeTile extends StatelessWidget {
                 ? theme.colorScheme.secondary
                 : theme.colorScheme.primary,
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               '${stagedFile!.path?.split('/').last ?? 'Subtitle Update'}${isReplace ? ' (Replace)' : ''}',

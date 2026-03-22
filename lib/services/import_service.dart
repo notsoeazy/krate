@@ -441,6 +441,7 @@ class ImportService {
                 updated.copyWith(
                   id: existing.id,
                   videoPath: existing.videoPath,
+                  subtitles: existing.subtitles,
                   fileStatus: existing.fileStatus,
                 ),
               );
@@ -721,6 +722,7 @@ class ImportService {
       final name = p.basename(src);
       final dest = p.join(baseDir, name);
 
+      debugPrint('[ImportService] Importing subtitle ($name) to $dest');
       onUpdate?.call('Importing subtitle: $name', i / srcPaths.length);
       await _moveFile(src, dest);
       subtitles.add(Subtitle(
@@ -742,8 +744,16 @@ class ImportService {
         final file = File(ep.videoPath!);
         if (await file.exists()) await file.delete();
       }
+      for (final sub in ep.subtitles) {
+        final subFile = File(sub.path);
+        if (await subFile.exists()) await subFile.delete();
+      }
       await _episodeRepo.update(
-        ep.copyWith(clearVideoPath: true, fileStatus: FileStatus.missing),
+        ep.copyWith(
+          clearVideoPath: true, 
+          subtitles: [], 
+          fileStatus: FileStatus.missing
+        ),
       );
     }
 

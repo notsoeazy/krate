@@ -153,7 +153,7 @@ class MediaDetailsEpisodeTile extends ConsumerWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 8),
         // Episode Metadata (Runtime, Status)
         progressAsync.when(
           data: (progress) {
@@ -223,7 +223,7 @@ class MediaDetailsEpisodeTile extends ConsumerWidget {
             episode.description ?? 'No description available.',
             style: theme.textTheme.bodySmall,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           // Air Date & File Path
           if (episode.airDate != null)
             _buildDetailRow(

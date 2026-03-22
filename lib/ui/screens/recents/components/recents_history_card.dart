@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:krate/ui/widgets/unavailable_overlay.dart';
 
 class RecentsHistoryCard extends StatelessWidget {
   final String title;
@@ -39,14 +38,13 @@ class RecentsHistoryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Poster
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: SizedBox(
-                    width:
-                        84, // Slightly wider for 2:3 ratio against 120 height approx
-                    child: UnavailableOverlay(
-                      isUnavailable: isUnavailable,
-                      borderRadius: 0,
+                Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      width:
+                          84, // Slightly wider for 2:3 ratio against 120 height approx
                       child:
                           localPosterPath != null &&
                               File(localPosterPath!).existsSync()
@@ -63,7 +61,7 @@ class RecentsHistoryCard extends StatelessWidget {
 
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(8),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,

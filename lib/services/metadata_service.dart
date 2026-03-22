@@ -66,9 +66,11 @@ class MetadataService {
           'fileStatus': e.fileStatus.name,
         };
       }).toList();
-    } else if (episodes.isNotEmpty && episodes.first.videoPath != null) {
+    } else if (episodes.isNotEmpty) {
       final ep = episodes.first;
-      data['videoPath'] = p.relative(ep.videoPath!, from: podPath);
+      if (ep.videoPath != null) {
+        data['videoPath'] = p.relative(ep.videoPath!, from: podPath);
+      }
       data['subtitles'] = ep.subtitles.map((s) => {
         'name': s.name,
         'path': p.relative(s.path, from: podPath),

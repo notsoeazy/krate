@@ -40,7 +40,7 @@ class ContinueWatchingRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             scrollDirection: Axis.horizontal,
             itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            separatorBuilder: (_, _) => const SizedBox(width: 16),
             itemBuilder: (context, index) =>
                 ContinueWatchingCard(content: items[index]),
           ),

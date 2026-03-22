@@ -21,7 +21,7 @@ class RecentsHistoryTab extends ConsumerWidget {
             return ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               children: const [
-                SizedBox(height: 200),
+                const SizedBox(height: 8),
                 EmptyStateView(
                   icon: Icons.history,
                   message: 'No watch history',
@@ -116,7 +116,7 @@ class _HistoryItem extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(2),
                 color: isFinished ? theme.colorScheme.primary : null,
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 8),
               // Time Remaining Text
               Text(
                 isFinished ? 'Completed' : '$minLeft mins left',

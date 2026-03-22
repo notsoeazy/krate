@@ -89,7 +89,7 @@ class _SyncToast extends StatelessWidget {
                 value: progress > 0 && progress < 1 ? progress : null,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 mainAxisSize: MainAxisSize.min,

@@ -52,7 +52,7 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               if (_isExpanded) _buildJobPanel(context, jobs),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               _buildFAB(context, activeCount, hasJobs),
             ],
           ),
@@ -109,7 +109,7 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
           children: [
             // Header
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+              padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -151,7 +151,7 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
 
   Widget _buildJobTile(BuildContext context, ImportJob job, ThemeData theme) {
     return Padding(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -177,7 +177,7 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
               _StatusIcon(job: job),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           Text(job.currentStep ?? '', style: theme.textTheme.labelSmall),
           if (job.isActive) ...[
             const SizedBox(height: 8),
@@ -188,7 +188,7 @@ class _ImportOverlayState extends ConsumerState<ImportOverlay> {
             ),
           ],
           if (job.hasFailed) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
             Text(
               job.error ?? 'Unknown error',
               style: theme.textTheme.labelSmall?.copyWith(
@@ -260,7 +260,7 @@ class _ImportToastState extends ConsumerState<ImportToast> {
                 child: Row(
                   children: [
                     _StatusIcon(job: job),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,

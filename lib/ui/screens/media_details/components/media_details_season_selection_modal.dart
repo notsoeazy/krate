@@ -90,13 +90,11 @@ class _MediaDetailsSeasonSelectionModalState
                                     widget.content.id!,
                                     _selectedSeasons.toList(),
                                   );
-                                  if (mounted) Navigator.pop(context);
+                                  if (!context.mounted) return;
+                                  Navigator.pop(context);
                                 },
                           icon: const Icon(Icons.history_rounded),
                           label: const Text('Clear Progress'),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size(double.infinity, 48),
-                          ),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -109,13 +107,11 @@ class _MediaDetailsSeasonSelectionModalState
                                     widget.content.id!,
                                     _selectedSeasons.toList(),
                                   );
-                                  if (mounted) Navigator.pop(context);
+                                  if (!context.mounted) return;
+                                  Navigator.pop(context);
                                 },
                           icon: const Icon(Icons.done_all_rounded),
                           label: const Text('Mark Watched'),
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(double.infinity, 48),
-                          ),
                         ),
                       ),
                     ],

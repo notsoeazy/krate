@@ -107,7 +107,7 @@ class MediaInfoRow extends StatelessWidget {
       width: 110,
       height: 165,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: useOnBackdrop
             ? const [
                 BoxShadow(
@@ -119,7 +119,7 @@ class MediaInfoRow extends StatelessWidget {
             : null,
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         child: image != null
             ? Image(
                 key: ValueKey('${content.id}_${content.updatedAt}'),
@@ -183,7 +183,7 @@ class MediaInfoRow extends StatelessWidget {
     return Row(
       children: [
         const Icon(Icons.star, color: Colors.amber, size: 16),
-        const SizedBox(width: 4),
+        const SizedBox(width: 8),
         Text(
           content.voteAverage.toStringAsFixed(1),
           style: style?.copyWith(

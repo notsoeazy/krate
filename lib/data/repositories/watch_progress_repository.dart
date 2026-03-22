@@ -26,6 +26,33 @@ class WatchProgressRepository {
     return rows.isEmpty ? null : WatchProgress.fromMap(rows.first);
   }
 
+  Future<List<WatchProgress>> getProgressForContent(int contentId) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'watch_progress',
+      where: 'contentId = ?',
+      whereArgs: [contentId],
+    );
+    return rows.map(WatchProgress.fromMap).toList();
+  }
+
+  Future<void> restoreProgress(List<WatchProgress> items) async {
+    final db = await _db.database;
+    await db.transaction((txn) async {
+      for (final item in items) {
+        // Assume lastWatchedAt needs to be a string or is already handled by toMap()
+        await txn.insert(
+          'watch_progress',
+          {
+            ...item.toMap(),
+            'lastWatchedAt': item.lastWatchedAt.toIso8601String(),
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+    });
+  }
+
   // Returns all content IDs that have unfinished progress, ordered by
   // most recently watched. Used to populate "Continue Watching".
   Future<List<Map<String, dynamic>>> getInProgress({int limit = 20}) async {

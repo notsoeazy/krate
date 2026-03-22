@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/widgets/confirmation_dialog.dart';
 import 'package:krate/utils/extensions.dart';
+import 'package:krate/utils/feedback_utils.dart';
 
 class SettingsBackupSection extends ConsumerWidget {
   const SettingsBackupSection({super.key});
@@ -57,15 +58,11 @@ class SettingsBackupSection extends ConsumerWidget {
       await ref.read(backupServiceProvider).createBackup();
       ref.invalidate(lastBackupTimeProvider);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Backup created successfully')),
-        );
+        FeedbackUtils.showSuccessSnackBar(context, 'Backup created successfully');
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Backup failed: $e')));
+        FeedbackUtils.showErrorSnackBar(context, 'Backup failed', error: e);
       }
     }
   }
@@ -94,18 +91,14 @@ class SettingsBackupSection extends ConsumerWidget {
         ref.invalidate(completedContentProvider);
 
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Database restored successfully')),
-          );
+          FeedbackUtils.showSuccessSnackBar(context, 'Database restored successfully');
         }
       } catch (e) {
         if (e.toString().contains('Backup file not found')) {
           ref.invalidate(lastBackupTimeProvider);
         }
         if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Restore failed: $e')));
+          FeedbackUtils.showErrorSnackBar(context, 'Restore failed', error: e);
         }
       }
     }

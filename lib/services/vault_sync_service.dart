@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:krate/utils/constants.dart';
 import 'package:krate/data/models/content.dart';
 import 'package:krate/data/models/episode.dart';
+import 'package:krate/data/models/subtitle.dart';
 import 'package:krate/data/repositories/content_repository.dart';
 import 'package:krate/data/repositories/episode_repository.dart';
 import 'package:krate/services/metadata_service.dart';
@@ -42,7 +43,9 @@ class VaultSyncService {
 
     final vaultDir = Directory('$root/$kVaultFolderName');
     if (!await vaultDir.exists()) {
-      debugPrint('[VaultSync] Aborting: Vault directory not found at ${vaultDir.path}');
+      debugPrint(
+        '[VaultSync] Aborting: Vault directory not found at ${vaultDir.path}',
+      );
       return;
     }
 
@@ -77,15 +80,19 @@ class VaultSyncService {
       final pod = pods[i];
       onProgress?.call(i / pods.length);
       final tmdbId = _extractTmdbId(pod.path);
-      
+
       if (tmdbId == null) {
-        debugPrint('[VaultSync] Skipping: Invalid folder name format: ${pod.path}');
+        debugPrint(
+          '[VaultSync] Skipping: Invalid folder name format: ${pod.path}',
+        );
         continue;
       }
-      
+
       final isSeries = pod.path.contains(kSeriesDirName);
-      debugPrint('[VaultSync] Syncing Pod [$tmdbId] (${isSeries ? "Series" : "Movie"}): ${_baseName(pod.path)}');
-      
+      debugPrint(
+        '[VaultSync] Syncing Pod [$tmdbId] (${isSeries ? "Series" : "Movie"}): ${_baseName(pod.path)}',
+      );
+
       onStatus?.call('Syncing ${_baseName(pod.path)}...');
       await _syncPod(pod, tmdbId, isSeries);
     }
@@ -95,22 +102,26 @@ class VaultSyncService {
     onStatus?.call('Marking missing entries...');
     final allContent = await contentRepo.getAll();
     int markedMissing = 0;
-    
+
     for (final content in allContent) {
       if (content.tmdbId != null && !foundTmdbIds.contains(content.tmdbId)) {
-        if (content.fileStatus != FileStatus.ready) continue; 
-        
-        debugPrint('[VaultSync] Ghost detected: Pod folder missing for ${content.title} (ID: ${content.tmdbId}).');
+        if (content.fileStatus != FileStatus.ready) continue;
+
+        debugPrint(
+          '[VaultSync] Ghost detected: Pod folder missing for ${content.title} (ID: ${content.tmdbId}).',
+        );
         await _markContentAsMissing(content);
         markedMissing++;
       } else if (content.fileStatus == FileStatus.ready) {
         // Pod exists, but maybe file was manually deleted?
-        // _syncPod already handles this and updates DB, 
+        // _syncPod already handles this and updates DB,
         // but we want to know if sync discovered missing files.
       }
     }
 
-    debugPrint('[VaultSync] Sync complete. Folders missing: $markedMissing. Entries reconcilled.');
+    debugPrint(
+      '[VaultSync] Sync complete. Folders missing: $markedMissing. Entries reconcilled.',
+    );
     onStatus?.call('Vault sync complete');
     onProgress?.call(1.0);
   }
@@ -146,7 +157,7 @@ class VaultSyncService {
     }
 
     final allContent = await contentRepo.getAll();
-    // We compare with ALL content in the DB. 
+    // We compare with ALL content in the DB.
     // If it's on disk but the DB doesn't know it (or thinks it's missing), we need sync.
     // If it's in DB (not missing) but NOT on disk, we need sync.
     final dbReadyIds = allContent
@@ -155,36 +166,192 @@ class VaultSyncService {
         .whereType<int>()
         .toSet();
 
-    // 1. New things on disk?
+    final dbTrackedIds = allContent
+        .map((c) => c.tmdbId)
+        .whereType<int>()
+        .toSet();
+
+    // New things on disk?
     for (final id in diskIds) {
-      if (!dbReadyIds.contains(id)) {
-        debugPrint('[VaultSync] Scout: Found new/missing-in-db content on disk (ID: $id). Sync recommended.');
+      if (!dbTrackedIds.contains(id)) {
+        debugPrint(
+          '[VaultSync] Scout: Found entirely untracked content on disk (ID: $id). Sync recommended.',
+        );
         return true;
       }
     }
 
-    // 2. Gone from disk? (Folder missing)
+    // Gone from disk? (Folder missing)
     for (final id in dbReadyIds) {
       if (!diskIds.contains(id)) {
-        debugPrint('[VaultSync] Scout: Pod folder for ID: $id is no longer on disk. Sync recommended.');
+        debugPrint(
+          '[VaultSync] Scout: Pod folder for ID: $id is no longer on disk. Sync recommended.',
+        );
         return true;
       }
     }
 
-    // 3. Deep check (Media missing for movies)
-    // For series it's more expensive to scout deeply every startup, 
-    // so we prioritize movies as they are the most common "single file" case.
+    // Deep check for missing/orphan media and subtitles
     for (final content in allContent) {
-      if (content.contentType == ContentType.movie && 
-          content.fileStatus == FileStatus.ready && 
-          content.podPath != null) {
-        final podDir = Directory(content.podPath!);
-        if (await podDir.exists()) {
-          final hasVideo = await _findAnyVideoFile(podDir) != null;
-          if (!hasVideo) {
-            debugPrint('[VaultSync] Scout: Media file missing for movie "${content.title}" (ID: ${content.tmdbId}). Sync recommended.');
+      if (content.podPath == null) {
+        continue;
+      }
+      final podDir = Directory(content.podPath!);
+
+      if (content.contentType == ContentType.movie) {
+        final ep = await episodeRepo.getMovieEpisode(content.id!);
+        if (ep != null && ep.fileStatus == FileStatus.ready) {
+          if (ep.videoPath == null || !await File(ep.videoPath!).exists()) {
+            debugPrint(
+              '[VaultSync] Scout: Media file missing for movie "${content.title}". Sync recommended.',
+            );
             return true;
           }
+          for (final sub in ep.subtitles) {
+            if (!await File(sub.path).exists()) {
+              debugPrint(
+                '[VaultSync] Scout: Subtitle file missing for movie "${content.title}". Sync recommended.',
+              );
+              return true;
+            }
+          }
+        }
+
+        // Scan directory for manually added untracked videos or orphan subtitles
+        if (await podDir.exists()) {
+          final isVideoTracked =
+              ep != null &&
+              ep.videoPath != null &&
+              ep.fileStatus == FileStatus.ready;
+          final trackedSubs = ep?.subtitles ?? [];
+          try {
+            await for (final f in podDir.list()) {
+              if (f is File) {
+                final lowerPath = f.path.toLowerCase();
+                if ([
+                  '.mp4',
+                  '.mkv',
+                  '.avi',
+                  '.mov',
+                  '.wmv',
+                ].any((ext) => lowerPath.endsWith(ext))) {
+                  if (!isVideoTracked) {
+                    debugPrint(
+                      '[VaultSync] Scout: Untracked video found for movie "${content.title}". Sync recommended.',
+                    );
+                    return true;
+                  }
+                } else if (kAllowedSubtitleExtensions.any(
+                  (ext) => lowerPath.endsWith('.$ext'),
+                )) {
+                  final isLinked = trackedSubs.any(
+                    (s) =>
+                        s.path == f.path || s.path.toLowerCase() == lowerPath,
+                  );
+                  if (!isLinked) {
+                    debugPrint(
+                      '[VaultSync] Scout: Orphan subtitle found for movie "${content.title}". Sync recommended.',
+                    );
+                    return true;
+                  }
+                }
+              }
+            }
+          } catch (_) {}
+        }
+      } else {
+        // Series
+        final episodes = await episodeRepo.getByContentId(content.id!);
+        final readyEps = episodes
+            .where((e) => e.fileStatus == FileStatus.ready)
+            .toList();
+
+        for (final ep in readyEps) {
+          if (ep.videoPath == null || !await File(ep.videoPath!).exists()) {
+            debugPrint(
+              '[VaultSync] Scout: Media file missing for series "${content.title}" S${ep.seasonNumber} E${ep.episodeNumber}. Sync recommended.',
+            );
+            return true;
+          }
+          for (final sub in ep.subtitles) {
+            if (!await File(sub.path).exists()) {
+              debugPrint(
+                '[VaultSync] Scout: Subtitle file missing for series "${content.title}" S${ep.seasonNumber} E${ep.episodeNumber}. Sync recommended.',
+              );
+              return true;
+            }
+          }
+        }
+
+        // Check for new episode folders or orphan subtitles
+        if (await podDir.exists()) {
+          try {
+            await for (final seasonEntity in podDir.list()) {
+              if (seasonEntity is Directory &&
+                  _baseName(seasonEntity.path).startsWith('Season_')) {
+                final sNum = int.tryParse(
+                  _baseName(seasonEntity.path).split('_').last,
+                );
+                await for (final epsEntity in seasonEntity.list()) {
+                  if (epsEntity is Directory &&
+                      _baseName(epsEntity.path).startsWith(kEpisodeDirPrefix)) {
+                    final eNum = int.tryParse(
+                      _baseName(epsEntity.path).split('_').last,
+                    );
+                    final epsDirPath = epsEntity.path;
+
+                    if (sNum == null || eNum == null) continue;
+
+                    // Find exactly the episode mapping to this directory
+                    final trackedEp = episodes.cast<Episode?>().firstWhere(
+                      (e) => e!.seasonNumber == sNum && e.episodeNumber == eNum,
+                      orElse: () => null,
+                    );
+
+                    final isVideoTracked =
+                        trackedEp != null &&
+                        trackedEp.videoPath != null &&
+                        trackedEp.fileStatus == FileStatus.ready;
+                    final trackedSubs = trackedEp?.subtitles ?? [];
+
+                    await for (final f in epsEntity.list()) {
+                      if (f is File) {
+                        final lowerPath = f.path.toLowerCase();
+                        if ([
+                          '.mp4',
+                          '.mkv',
+                          '.avi',
+                          '.mov',
+                          '.wmv',
+                        ].any((ext) => lowerPath.endsWith(ext))) {
+                          if (!isVideoTracked) {
+                            debugPrint(
+                              '[VaultSync] Scout: Untracked video found in $epsDirPath. Sync recommended.',
+                            );
+                            return true;
+                          }
+                        } else if (kAllowedSubtitleExtensions.any(
+                          (ext) => lowerPath.endsWith('.$ext'),
+                        )) {
+                          final isLinked = trackedSubs.any(
+                            (s) =>
+                                s.path == f.path ||
+                                s.path.toLowerCase() == lowerPath,
+                          );
+                          if (!isLinked) {
+                            debugPrint(
+                              '[VaultSync] Scout: Orphan subtitle found in $epsDirPath. Sync recommended.',
+                            );
+                            return true;
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          } catch (_) {}
         }
       }
     }
@@ -289,18 +456,36 @@ class VaultSyncService {
       // Try to get existing episode from DB first to get its ID
       final existingEpisode = await episodeRepo.getMovieEpisode(contentId);
 
-      final movieEpisode = episodes.isNotEmpty
-          ? episodes.first.copyWith(id: existingEpisode?.id)
-          : (existingEpisode ??
-                Episode.forMovie(contentId: contentId, videoPath: null));
+      if (existingEpisode != null) {
+        debugPrint(
+          '[VaultSync] Pod [$tmdbId]: Using existing DB movie episode',
+        );
+      } else if (episodes.isNotEmpty) {
+        debugPrint(
+          '[VaultSync] Pod [$tmdbId]: Recovered movie episode from metadata.json',
+        );
+      }
+
+      final movieEpisode =
+          existingEpisode ??
+          (episodes.isNotEmpty
+              ? episodes.first.copyWith(id: null, contentId: contentId)
+              : Episode.forMovie(contentId: contentId, videoPath: null));
 
       // Scan pod dir for any video file
       final videoFile = await _findAnyVideoFile(pod);
+      final mergedSubtitles = await _reconcileSubtitles(
+        movieEpisode.subtitles,
+        pod,
+        movieEpisode.id ?? -1,
+      );
+
       if (videoFile != null) {
         content = content.copyWith(fileStatus: FileStatus.ready);
         syncedEpisodes.add(
           movieEpisode.copyWith(
             videoPath: videoFile.path,
+            subtitles: mergedSubtitles,
             fileStatus: FileStatus.ready,
             contentId: contentId,
           ),
@@ -311,6 +496,7 @@ class VaultSyncService {
         syncedEpisodes.add(
           movieEpisode.copyWith(
             clearVideoPath: true,
+            subtitles: mergedSubtitles,
             fileStatus: FileStatus.missing,
             contentId: contentId,
           ),
@@ -362,18 +548,31 @@ class VaultSyncService {
           matchedFile = await _findAnyVideoFile(episodeDir);
         }
 
+        final mergedSubtitles = await _reconcileSubtitles(
+          ep.subtitles,
+          episodeDir,
+          ep.id ?? -1,
+        );
+
         if (matchedFile != null) {
           anyReady = true;
           syncedEpisodes.add(
             ep.copyWith(
               videoPath: matchedFile.path,
+              subtitles: mergedSubtitles,
               fileStatus: FileStatus.ready,
             ),
           );
         } else {
-          debugPrint('[VaultSync] Pod [$tmdbId]: NO MEDIA FILE FOUND for S$seasonStr E$episodeStr');
+          debugPrint(
+            '[VaultSync] Pod [$tmdbId]: NO MEDIA FILE FOUND for S$seasonStr E$episodeStr',
+          );
           syncedEpisodes.add(
-            ep.copyWith(clearVideoPath: true, fileStatus: FileStatus.missing),
+            ep.copyWith(
+              clearVideoPath: true,
+              subtitles: mergedSubtitles,
+              fileStatus: FileStatus.missing,
+            ),
           );
         }
       }
@@ -388,8 +587,10 @@ class VaultSyncService {
       createdAt: existing?.createdAt,
       updatedAt: DateTime.now(),
     );
-    
-    debugPrint('[VaultSync] Pod [$tmdbId]: Updating Content DB entry (${updatedContent.title})');
+
+    debugPrint(
+      '[VaultSync] Pod [$tmdbId]: Updating Content DB entry (${updatedContent.title})',
+    );
     await contentRepo.update(updatedContent);
 
     for (final ep in syncedEpisodes) {
@@ -443,5 +644,55 @@ class VaultSyncService {
       }
     } catch (_) {}
     return null;
+  }
+
+  Future<List<Subtitle>> _reconcileSubtitles(
+    List<Subtitle> existing,
+    Directory dir,
+    int episodeId,
+  ) async {
+    final List<Subtitle> reconciled = [];
+
+    // Keep existing subtitles that still exist on disk
+    for (final sub in existing) {
+      final file = File(sub.path);
+      if (await file.exists()) {
+        reconciled.add(sub);
+      } else {
+        debugPrint('[VaultSync] Removed missing subtitle entry: ${sub.name}');
+      }
+    }
+
+    // Scan the directory for any subtitle files not already in reconciled
+    try {
+      if (await dir.exists()) {
+        await for (final entity in dir.list()) {
+          if (entity is File) {
+            final path = entity.path;
+            final lowerPath = path.toLowerCase();
+
+            if (kAllowedSubtitleExtensions.any(
+              (ext) => lowerPath.endsWith('.$ext'),
+            )) {
+              // Check if it's already in our reconciled list by path comparison
+              final isAlreadyLinked = reconciled.any(
+                (sub) =>
+                    sub.path == path || sub.path.toLowerCase() == lowerPath,
+              );
+
+              if (!isAlreadyLinked) {
+                final name = _baseName(path);
+                debugPrint('[VaultSync] Auto-linked orphan subtitle: $name');
+                reconciled.add(
+                  Subtitle(episodeId: episodeId, path: path, name: name),
+                );
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    return reconciled;
   }
 }

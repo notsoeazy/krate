@@ -122,7 +122,7 @@ class HomeScreen extends ConsumerWidget {
           error: (e, _) => const SizedBox.shrink(),
         ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
       ],
     );
   }

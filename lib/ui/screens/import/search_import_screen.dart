@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/widgets/empty_state_view.dart';
 import 'package:krate/ui/screens/import/components/search_result_tile.dart';
+import 'package:krate/utils/errors.dart';
+import 'package:krate/utils/feedback_utils.dart';
 
 class SearchImportScreen extends ConsumerStatefulWidget {
   const SearchImportScreen({super.key});
@@ -38,16 +40,19 @@ class _SearchImportScreenState extends ConsumerState<SearchImportScreen> {
       if (mounted) setState(() => _results = results);
     } catch (e) {
       if (mounted) {
-        final isOffline =
-            e.toString().toLowerCase().contains('socket') ||
-            e.toString().toLowerCase().contains('network') ||
-            e.toString().toLowerCase().contains('connection');
-        if (isOffline) {
+        debugPrint('[SearchImportScreen] Search Error: $e');
+        if (e is NoInternetException) {
           setState(() => _isOffline = true);
-        } else {
-          ScaffoldMessenger.of(
+          FeedbackUtils.showErrorSnackBar(
             context,
-          ).showSnackBar(SnackBar(content: Text('Search failed: $e')));
+            'No internet connection. Cannot connect to TMDB.',
+          );
+        } else {
+          FeedbackUtils.showErrorSnackBar(
+            context,
+            'Search failed',
+            error: e is KrateException ? e.message : e.toString(),
+          );
         }
       }
     } finally {
@@ -75,11 +80,16 @@ class _SearchImportScreenState extends ConsumerState<SearchImportScreen> {
                     )
                   : const Icon(Icons.search),
               trailing: [
-                IconButton(
-                  icon: const Icon(Icons.search),
-                  onPressed: () => _onSearch(_searchController.text),
-                ),
+                if (_searchController.text.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() {});
+                    },
+                  ),
               ],
+              onChanged: (_) => setState(() {}),
               onSubmitted: _onSearch,
               padding: const WidgetStatePropertyAll(
                 EdgeInsets.symmetric(horizontal: 16),

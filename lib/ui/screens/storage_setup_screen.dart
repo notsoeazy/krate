@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/providers/providers.dart';
+import 'package:krate/utils/feedback_utils.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class StorageSetupScreen extends ConsumerStatefulWidget {
@@ -31,16 +32,12 @@ class _StorageSetupScreenState extends ConsumerState<StorageSetupScreen> {
 
         if (!storageGranted && !manageGranted) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text(
-                  'Storage permission is required to manage your media vault. Please enable it in settings.',
-                ),
-                action: SnackBarAction(
-                  label: 'Settings',
-                  onPressed: () => openAppSettings(),
-                ),
-                duration: const Duration(seconds: 5),
+            FeedbackUtils.showErrorSnackBar(
+              context,
+              'Storage permission is required to manage your media vault. Please enable it in settings.',
+              action: SnackBarAction(
+                label: 'Settings',
+                onPressed: () => openAppSettings(),
               ),
             );
           }
@@ -110,7 +107,7 @@ class _StorageSetupScreenState extends ConsumerState<StorageSetupScreen> {
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
-                const SizedBox(height: 48),
+                const SizedBox(height: 32),
                 // Actions
                 if (_isLoading)
                   const CircularProgressIndicator()

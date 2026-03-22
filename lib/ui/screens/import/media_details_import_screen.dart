@@ -9,6 +9,7 @@ import 'package:krate/ui/screens/import/components/media_import_preview.dart';
 import 'package:krate/ui/screens/import/components/file_picker_tile.dart';
 import 'package:krate/ui/screens/import/series_episode_picker_screen.dart';
 import 'package:krate/utils/file_utils.dart';
+import 'package:krate/utils/feedback_utils.dart';
 
 class MediaDetailsImportScreen extends ConsumerStatefulWidget {
   final int tmdbId;
@@ -53,9 +54,7 @@ class _MediaDetailsImportScreenState
       if (mounted) setState(() => _isLoading = false);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to load details: $e')));
+        FeedbackUtils.showErrorSnackBar(context, 'Failed to load details', error: e);
         Navigator.of(context).pop();
       }
     }
@@ -75,15 +74,11 @@ class _MediaDetailsImportScreenState
       }
     } on KrateException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
+        FeedbackUtils.showErrorSnackBar(context, e.message);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('An unexpected error occurred.')),
-        );
+        FeedbackUtils.showErrorSnackBar(context, 'An unexpected error occurred.');
       }
     } finally {
       if (mounted) setState(() => _isBusy = false);
@@ -127,9 +122,7 @@ class _MediaDetailsImportScreenState
     }
 
     if (_selectedFilePath == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a video file first')),
-      );
+      FeedbackUtils.showInfoSnackBar(context, 'Please select a video file first');
       return;
     }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:krate/data/models/episode.dart';
 import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/screens/media_details/components/media_management_episode_tile.dart';
+import 'package:krate/utils/feedback_utils.dart';
 
 class MediaManagementMovieList extends StatelessWidget {
   final Episode movieEp;
@@ -33,16 +34,12 @@ class MediaManagementMovieList extends StatelessWidget {
           onImport: () => notifier.pickMediaWithSubtitles(
             episodeId: movieEp.id!,
             episodeHasFile: movieEp.hasFile,
-            onError: (err) => ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(err)),
-            ),
+            onError: (err) => FeedbackUtils.showErrorSnackBar(context, err),
           ),
           onAddSubtitles: () => notifier.pickSubtitles(
             episodeId: movieEp.id!,
             existingVideoPath: movieEp.videoPath,
-            onError: (err) => ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(err)),
-            ),
+            onError: (err) => FeedbackUtils.showErrorSnackBar(context, err),
           ),
           onRemoveFile: () => notifier.removeStaged(movieEp.id!),
         ),

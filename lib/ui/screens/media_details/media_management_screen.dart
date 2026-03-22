@@ -7,7 +7,10 @@ import 'package:krate/ui/widgets/busy_overlay.dart';
 import 'package:krate/ui/screens/media_details/components/media_management_movie_list.dart';
 import 'package:krate/ui/screens/media_details/components/media_management_series_list.dart';
 import 'package:krate/ui/screens/media_details/components/media_management_bottom_bar.dart';
+import 'package:krate/ui/widgets/confirmation_dialog.dart';
 import 'package:krate/utils/constants.dart';
+import 'package:krate/utils/errors.dart';
+import 'package:krate/utils/feedback_utils.dart';
 
 class MediaManagementScreen extends ConsumerStatefulWidget {
   final int contentId;
@@ -58,30 +61,13 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
         .toList();
     if (toDelete.isEmpty) return;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.delete_outline),
-        title: const Text('Delete Media Files'),
-        content: Text(
-          'Delete media files for ${toDelete.length} episode(s)?\n'
+    final confirmed = await ConfirmationDialog.show(
+      context,
+      title: 'Delete Media Files',
+      message: 'Delete media files for ${toDelete.length} episode(s)?\n'
           'This removes the files from storage but keeps the episode in your library.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Theme.of(context).colorScheme.onError,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Delete',
+      isDestructive: true,
     );
 
     if (confirmed != true) return;
@@ -110,6 +96,8 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
       final importJobs = ref.read(importJobsProvider.notifier);
       final importService = ref.read(importServiceProvider);
 
+      bool tmdbFailed = false;
+      bool isOffline = false;
       // Combined Sync: Try TMDB Fetch first
       try {
         if (isSeries) {
@@ -124,10 +112,11 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
           );
         }
       } catch (e) {
-        debugPrint(
-          '[MediaManagement] Metadata fetch failed (likely offline): $e',
-        );
-        // If offline, we just continue to Vault Sync
+        debugPrint('[MediaManagementScreen] Metadata fetch error: $e');
+        if (e is NoInternetException) {
+          isOffline = true;
+        }
+        tmdbFailed = true;
       }
 
       // Vault Sync (targeted)
@@ -138,9 +127,13 @@ class _MediaManagementScreenState extends ConsumerState<MediaManagementScreen> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Sync complete')));
+        if (isOffline) {
+          FeedbackUtils.showInfoSnackBar(context, 'Vault synced, but no internet connection to TMDB.');
+        } else if (tmdbFailed) {
+          FeedbackUtils.showInfoSnackBar(context, 'Vault synced, but TMDB fetch failed.');
+        } else {
+          FeedbackUtils.showSuccessSnackBar(context, 'Sync complete');
+        }
       }
     } finally {
       if (mounted) _notifier.markJobDone();

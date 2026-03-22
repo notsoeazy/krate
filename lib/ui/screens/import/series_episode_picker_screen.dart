@@ -7,6 +7,7 @@ import 'package:krate/providers/providers.dart';
 import 'package:krate/ui/widgets/busy_overlay.dart';
 import 'package:krate/ui/screens/media_details/components/media_management_episode_tile.dart';
 import 'package:krate/utils/file_utils.dart';
+import 'package:krate/utils/feedback_utils.dart';
 
 class SeriesEpisodePickerScreen extends ConsumerStatefulWidget {
   final int tmdbId;
@@ -98,15 +99,11 @@ class _SeriesEpisodePickerScreenState
       }
       ref.invalidate(contentEpisodesProvider(_content!.id!));
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Refreshed from TMDB')));
+        FeedbackUtils.showSuccessSnackBar(context, 'Refreshed from TMDB');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Refresh failed: $e')));
+        FeedbackUtils.showErrorSnackBar(context, 'Refresh failed', error: e);
       }
     } finally {
       if (mounted) setState(() => _isLoadingTmdb = false);
@@ -129,15 +126,11 @@ class _SeriesEpisodePickerScreenState
       }
     } on KrateException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
+        FeedbackUtils.showErrorSnackBar(context, e.message);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('An unexpected error occurred.')),
-        );
+        FeedbackUtils.showErrorSnackBar(context, 'An unexpected error occurred.');
       }
     } finally {
       if (mounted) setState(() => _isPickingFile = false);

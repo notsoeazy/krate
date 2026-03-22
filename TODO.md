@@ -3,9 +3,6 @@
 ## ⚡ Current Priorities
 
 1.  **Import Rework**: Auto-search by filename and dedicated import screen.
-2.  **Mark as Complete**: Manually toggle "watched" status for episodes/movies.
-3.  **Handle Missing but Completed**: Graceful handling/badges for watched items whose files were deleted.
-4.  **Delete Media**: Implementation of full pod and granular file deletion.
 
 ## Phase 1: Core Localization & Stabilization 🛠️
 
@@ -17,7 +14,7 @@ _Goal: Ensure the library is robust, portable, and correctly captures all metada
 - [x] **Multi-File Batch Import**: Support importing media along with multiple subtitles.
 - [x] **Search Marking**: Mark TMDB search results that are already in the library.
 - [x] **Pod automation**: Auto-discovery of existing pod folders in vault.
-- [ ] **Delete Media**: Full deletion (metadata + files) from Library/Details screen.
+- [x] **Delete Media**: Full deletion (metadata + files) from Library/Details screen.
 
 ## Phase 2: Enhanced Playback & UX 🎬
 
@@ -28,8 +25,8 @@ _Goal: Improve usability and make playback feel seamless._
 - [ ] **Player Screen Lock**: Prevent accidental touches during playback.
 - [ ] **Series Navigation**: "Next Episode" and "Previous Episode" buttons in player.
 - [ ] **Auto-Play**: Automatically start the next episode.
-- [ ] **Mark as Complete**: Manually toggle the "watched" status without playing the file.
-- [ ] **Continue Watching Redesign**: Improved logic and UI for resuming content.
+- [x] **Mark as Complete**: Manually toggle the "watched" status without playing the file.
+- [x] **Continue Watching Redesign**: Improved logic and UI for resuming content.
 - [x] **Search Library**: Quickly find content within the Library tab.
 
 ## Phase 3: Advanced Features & Polish ✨
@@ -39,8 +36,8 @@ _Goal: Add power-user features and final UI consistency._
 - [ ] **Genre Filters**: Filter library by TMDB genres.
 - [ ] **Settings Menu**: Root directory selection, theming, and cache management.
 - [ ] **Watch Statistics**: Total watch time and content counters.
-- [ ] **Granular Storage**: Delete video files only while keeping metadata entries.
-- [ ] **JSON Backup & Export**: Export library data to a portable JSON archive for backup.
+- [x] **Granular Storage**: Delete video files only while keeping metadata entries.
+- [x] **JSON Backup & Export**: Export library data to a portable JSON archive for backup.
 - [ ] **Reworked Import Screen**: Dedicated screen for importing media, accessible via FAB, Settings, or Top Bar.
 - [ ] **Auto-Search Import**: Rework the import flow to automatically search based on filename for matching metadata.
 - [ ] **External Player**: Option to open files in VLC/MX Player.
@@ -64,3 +61,5 @@ _Goal: Bringing Krate to the Desktop._
 - [x] History & Completed Items tabs
 - [x] Premium Player (Controls, Progress, Resume)
 - [x] Metadata Stabilization (`.metadata.json` source of truth)
+- [x] Watch Status Toggle & Granular File Deletion
+- [x] JSON Backup & Export
