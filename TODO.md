@@ -34,8 +34,10 @@ _Goal: Improve usability and make playback feel seamless._
 _Goal: Add power-user features and final UI consistency._
 
 - [ ] **Genre Filters**: Filter library by TMDB genres.
-- [ ] **Settings Menu**: Root directory selection, theming, and cache management.
+- [x] **Settings Menu**: Root directory selection, appearance customization, and cache management.
 - [ ] **Watch Statistics**: Total watch time and content counters.
+- [x] **New Theme Engine**: Multi-palette support (Midnight, Forest, Crimson, Sunset, Rose, Monochrome).
+- [x] **UI Polish**: Material 3 scroll-under colors and transparent search bar transitions.
 - [x] **Granular Storage**: Delete video files only while keeping metadata entries.
 - [x] **JSON Backup & Export**: Export library data to a portable JSON archive for backup.
 - [ ] **Reworked Import Screen**: Dedicated screen for importing media, accessible via FAB, Settings, or Top Bar.
@@ -63,3 +65,5 @@ _Goal: Bringing Krate to the Desktop._
 - [x] Metadata Stabilization (`.metadata.json` source of truth)
 - [x] Watch Status Toggle & Granular File Deletion
 - [x] JSON Backup & Export
+- [x] **Appearance Customization**: Theme mode, multi-color palettes, and UI polish.
+- [x] **Lint Fixes**: General code quality audit and RadioGroup refactoring.

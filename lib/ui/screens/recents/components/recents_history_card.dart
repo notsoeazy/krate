@@ -52,9 +52,9 @@ class RecentsHistoryCard extends StatelessWidget {
                               File(localPosterPath!),
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) =>
-                                  _buildPlaceholderIcon(),
+                                  _buildPlaceholderIcon(context),
                             )
-                          : _buildPlaceholderIcon(),
+                          : _buildPlaceholderIcon(context),
                     ),
                   ),
                 ),
@@ -126,11 +126,16 @@ class RecentsHistoryCard extends StatelessWidget {
     );
   }
 
-  Widget _buildPlaceholderIcon() {
+  Widget _buildPlaceholderIcon(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
-      color: Colors.black26,
-      child: const Center(
-        child: Icon(Icons.movie, color: Colors.white54, size: 32),
+      color: theme.colorScheme.surfaceContainerHighest,
+      child: Center(
+        child: Icon(
+          Icons.movie,
+          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+          size: 32,
+        ),
       ),
     );
   }

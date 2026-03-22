@@ -26,12 +26,17 @@ class KrateApp extends ConsumerWidget {
     final textTheme = createTextTheme(context, kBodyFont, kDisplayFont);
     final materialTheme = MaterialTheme(textTheme);
 
+    final themeMode = ref.watch(themeModeProvider);
+    final schemeIndex = ref.watch(themeSchemeProvider);
+
+    final scheme = MaterialTheme.schemes[schemeIndex.clamp(0, MaterialTheme.schemes.length - 1)];
+
     return MaterialApp(
       title: 'Krate',
       debugShowCheckedModeBanner: false,
-      theme: materialTheme.light(),
-      darkTheme: materialTheme.dark(),
-      themeMode: ThemeMode.dark,
+      theme: materialTheme.theme(scheme.light()),
+      darkTheme: materialTheme.theme(scheme.dark()),
+      themeMode: themeMode,
       builder: (context, child) => GlobalToastOverlay(child: child!),
       home: vaultStatus.when(
         data: (status) {

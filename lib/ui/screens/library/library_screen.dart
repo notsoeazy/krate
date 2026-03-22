@@ -65,13 +65,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Library'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh library',
-            onPressed: _refresh,
-          ),
-        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(112),
           child: Column(

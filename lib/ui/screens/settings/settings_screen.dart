@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:krate/ui/screens/settings/components/settings_appearance_section.dart';
 import 'package:krate/ui/screens/settings/components/settings_about_section.dart';
 import 'package:krate/ui/screens/settings/components/settings_storage_section.dart';
 import 'package:krate/ui/screens/settings/components/settings_backup_section.dart';
@@ -13,6 +14,12 @@ class SettingsScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [
+          // Appearance
+          _settingsSectionHeader('Appearance', context),
+          const SettingsAppearanceSection(),
+
+          const SizedBox(height: 8),
+
           // Storage
           _settingsSectionHeader('Storage', context),
           SettingsStorageSection(),

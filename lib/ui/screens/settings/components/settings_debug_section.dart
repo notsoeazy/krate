@@ -53,9 +53,9 @@ class SettingsDebugSection extends ConsumerWidget {
                 dense: true,
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Operation completed successfully'),
-                      backgroundColor: Colors.green,
+                    SnackBar(
+                      content: const Text('Operation completed successfully'),
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                     ),
                   );
                 },
@@ -65,9 +65,9 @@ class SettingsDebugSection extends ConsumerWidget {
                 dense: true,
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('An error occurred during the operation'),
-                      backgroundColor: Colors.red,
+                    SnackBar(
+                      content: const Text('An error occurred during the operation'),
+                      backgroundColor: Theme.of(context).colorScheme.error,
                     ),
                   );
                 },

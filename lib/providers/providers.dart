@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/painting.dart' show imageCache;
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:krate/utils/constants.dart';
 import 'package:krate/data/models/content.dart';
@@ -21,6 +20,7 @@ import 'package:krate/services/tmdb_service.dart';
 import 'package:krate/services/vault_sync_service.dart';
 import 'package:krate/services/backup_service.dart';
 import 'package:krate/services/watch_progress_service.dart';
+import 'package:krate/services/settings_service.dart';
 import 'package:krate/utils/file_utils.dart';
 
 // Tab providers (starts at 0)
@@ -97,6 +97,51 @@ final watchProgressServiceProvider = Provider<WatchProgressService>((ref) {
 
 final backupServiceProvider = Provider<BackupService>((ref) {
   return BackupService(ref.read(storageServiceProvider));
+});
+
+final settingsServiceProvider = Provider<SettingsService>(
+  (ref) => SettingsService(),
+);
+
+// Theme providers
+class ThemeModeNotifier extends StateNotifier<ThemeMode> {
+  final SettingsService _service;
+  ThemeModeNotifier(this._service) : super(ThemeMode.system) {
+    _load();
+  }
+
+  Future<void> _load() async {
+    state = await _service.getThemeMode();
+  }
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    state = mode;
+    await _service.setThemeMode(mode);
+  }
+}
+
+final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>((ref) {
+  return ThemeModeNotifier(ref.read(settingsServiceProvider));
+});
+
+class ThemeSchemeNotifier extends StateNotifier<int> {
+  final SettingsService _service;
+  ThemeSchemeNotifier(this._service) : super(0) {
+    _load();
+  }
+
+  Future<void> _load() async {
+    state = await _service.getThemeSchemeIndex();
+  }
+
+  Future<void> setThemeSchemeIndex(int index) async {
+    state = index;
+    await _service.setThemeSchemeIndex(index);
+  }
+}
+
+final themeSchemeProvider = StateNotifierProvider<ThemeSchemeNotifier, int>((ref) {
+  return ThemeSchemeNotifier(ref.read(settingsServiceProvider));
 });
 
 // Startup provider that performs checks, cleanup, scouting, and pre-fetching.

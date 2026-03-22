@@ -42,7 +42,7 @@ class SettingsAboutSection extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'Version 0.3.0-alpha',
+                    'Version 0.4.0-alpha',
                     style: textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.outline,
                     ),

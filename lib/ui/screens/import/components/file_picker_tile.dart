@@ -62,7 +62,11 @@ class FilePickerTile extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
                 child: Row(
                   children: [
-                    const Icon(Icons.subtitles, size: 16, color: Colors.grey),
+                    Icon(
+                      Icons.subtitles,
+                      size: 16,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(

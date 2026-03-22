@@ -104,7 +104,7 @@ class ContinueWatchingCard extends ConsumerWidget {
                     gradient: LinearGradient(
                       colors: [
                         Colors.transparent,
-                        theme.colorScheme.surface.withValues(alpha: 0.9),
+                        Colors.black.withValues(alpha: 0.8),
                       ],
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
@@ -129,6 +129,7 @@ class ContinueWatchingCard extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -145,7 +146,7 @@ class ContinueWatchingCard extends ConsumerWidget {
                                 Text(
                                   'S$season E$epNum',
                                   style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
+                                    color: Colors.white70,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -154,7 +155,7 @@ class ContinueWatchingCard extends ConsumerWidget {
                                   Text(
                                     '•',
                                     style: theme.textTheme.bodySmall?.copyWith(
-                                      color: theme.colorScheme.onSurfaceVariant,
+                                      color: Colors.white70,
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -169,7 +170,7 @@ class ContinueWatchingCard extends ConsumerWidget {
                             child: Text(
                               minsLeftText,
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
+                                color: Colors.white70,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,

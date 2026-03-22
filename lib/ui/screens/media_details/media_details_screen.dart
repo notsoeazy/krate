@@ -255,17 +255,15 @@ class _MediaDetailsAppBar extends ConsumerWidget {
       expandedHeight: _kExpandedHeight,
       pinned: true,
       stretch: true,
+      iconTheme: IconThemeData(
+        color: theme.brightness == Brightness.dark ? Colors.white : null,
+      ),
       title: LayoutBuilder(
         builder: (context, constraints) {
           final settings = context
               .dependOnInheritedWidgetOfExactType<FlexibleSpaceBarSettings>();
           if (settings == null) return const SizedBox.shrink();
-          final deltaExtent = settings.maxExtent - settings.minExtent;
-          final t =
-              (1.0 -
-                      (settings.currentExtent - settings.minExtent) /
-                          deltaExtent)
-                  .clamp(0.0, 1.0);
+          final t = _calculateScrollT(settings);
           return Opacity(
             opacity: t > 0.8 ? (t - 0.8) * 5 : 0.0,
             child: Text(
@@ -277,65 +275,102 @@ class _MediaDetailsAppBar extends ConsumerWidget {
           );
         },
       ),
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back),
-        onPressed: () => Navigator.of(context).pop(),
+      leading: LayoutBuilder(
+        builder: (context, constraints) {
+          final settings = context
+              .dependOnInheritedWidgetOfExactType<FlexibleSpaceBarSettings>();
+          final t = settings != null ? _calculateScrollT(settings) : 0.0;
+          final color = Color.lerp(
+            Colors.white,
+            theme.colorScheme.onSurface,
+            t,
+          );
+          return IconButton(
+            icon: Icon(Icons.arrow_back, color: color),
+            onPressed: () => Navigator.of(context).pop(),
+          );
+        },
       ),
       actions: [
-        MediaDetailsMoreMenu(
-          contentType: content.contentType,
-          onManage: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) =>
-                  MediaManagementScreen(contentId: content.id!),
-            ),
-          ),
-          onVaultSync: onVaultSync,
-          onFetchMetadata: onFetchMetadata,
-          onEnterSelectionMode: () {
-            ref
-                .read(watchedSelectionProvider(content.id!).notifier)
-                .enterSelectionMode();
-          },
-          onMarkSeasons: () =>
-              MediaDetailsSeasonSelectionModal.show(context, content),
-          onMarkFinished: () async {
-            if (content.contentType == ContentType.movie) {
-              final service = ref.read(watchProgressServiceProvider);
-              final snapshot = await service.markSeasonFinished(content.id!, 0);
-              if (context.mounted) {
-                FeedbackUtils.showUndoSnackBar(
-                  context,
-                  'Marked "${content.title}" as watched',
-                  () async {
-                    await service.restoreSnapshot(content.id!, snapshot);
-                  },
-                );
-              }
-            }
-          },
-          onClearSeriesProgress: () async {
-            final confirmed = await ConfirmationDialog.show(
-              context,
-              title: 'Clear watch history?',
-              message:
-                  'This will remove all watch progress for ${content.title}. This action cannot be undone.',
-              confirmLabel: 'Clear',
-              isDestructive: true,
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final settings = context
+                .dependOnInheritedWidgetOfExactType<FlexibleSpaceBarSettings>();
+            final t = settings != null ? _calculateScrollT(settings) : 0.0;
+            final color = Color.lerp(
+              Colors.white,
+              theme.colorScheme.onSurface,
+              t,
             );
-            if (confirmed) {
-              final service = ref.read(watchProgressServiceProvider);
-              final snapshot = await service.clearSeriesProgress(content.id!);
-              if (context.mounted) {
-                FeedbackUtils.showUndoSnackBar(
-                  context,
-                  'Cleared history for "${content.title}"',
-                  () async {
-                    await service.restoreSnapshot(content.id!, snapshot);
-                  },
-                );
-              }
-            }
+            return Theme(
+              data: theme.copyWith(
+                iconTheme: theme.iconTheme.copyWith(color: color),
+              ),
+              child: MediaDetailsMoreMenu(
+                contentType: content.contentType,
+                onManage:
+                    () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder:
+                            (context) =>
+                                MediaManagementScreen(contentId: content.id!),
+                      ),
+                    ),
+                onVaultSync: onVaultSync,
+                onFetchMetadata: onFetchMetadata,
+                onEnterSelectionMode: () {
+                  ref
+                      .read(watchedSelectionProvider(content.id!).notifier)
+                      .enterSelectionMode();
+                },
+                onMarkSeasons:
+                    () =>
+                        MediaDetailsSeasonSelectionModal.show(context, content),
+                onMarkFinished: () async {
+                  if (content.contentType == ContentType.movie) {
+                    final service = ref.read(watchProgressServiceProvider);
+                    final snapshot = await service.markSeasonFinished(
+                      content.id!,
+                      0,
+                    );
+                    if (context.mounted) {
+                      FeedbackUtils.showUndoSnackBar(
+                        context,
+                        'Marked "${content.title}" as watched',
+                        () async {
+                          await service.restoreSnapshot(content.id!, snapshot);
+                        },
+                      );
+                    }
+                  }
+                },
+                onClearSeriesProgress: () async {
+                  final confirmed = await ConfirmationDialog.show(
+                    context,
+                    title: 'Clear watch history?',
+                    message:
+                        'This will remove all watch progress for ${content.title}. This action cannot be undone.',
+                    confirmLabel: 'Clear',
+                    isDestructive: true,
+                  );
+                  if (confirmed) {
+                    final service = ref.read(watchProgressServiceProvider);
+                    final snapshot = await service.clearSeriesProgress(
+                      content.id!,
+                    );
+                    if (context.mounted) {
+                      FeedbackUtils.showUndoSnackBar(
+                        context,
+                        'Cleared history for "${content.title}"',
+                        () async {
+                          await service.restoreSnapshot(content.id!, snapshot);
+                        },
+                      );
+                    }
+                  }
+                },
+              ),
+            );
           },
         ),
       ],
@@ -358,13 +393,9 @@ class _MediaDetailsAppBar extends ConsumerWidget {
                       .dependOnInheritedWidgetOfExactType<
                         FlexibleSpaceBarSettings
                       >();
-                  final opacity = settings != null
-                      ? ((settings.currentExtent - settings.minExtent) /
-                                (settings.maxExtent - settings.minExtent))
-                            .clamp(0.0, 1.0)
-                      : 1.0;
+                  final t = settings != null ? _calculateScrollT(settings) : 0.0;
                   return Opacity(
-                    opacity: opacity,
+                    opacity: 1.0 - t,
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 56, 16, 16),
                       child: MediaInfoRow(
@@ -380,6 +411,12 @@ class _MediaDetailsAppBar extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  double _calculateScrollT(FlexibleSpaceBarSettings settings) {
+    final deltaExtent = settings.maxExtent - settings.minExtent;
+    return (1.0 - (settings.currentExtent - settings.minExtent) / deltaExtent)
+        .clamp(0.0, 1.0);
   }
 }
 

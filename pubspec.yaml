@@ -1,7 +1,7 @@
 name: krate
 description: "Your personal local media vault for movies and series."
 publish_to: "none"
-version: 0.3.0+1
+version: 0.4.0+1
 
 environment:
   sdk: ^3.11.0

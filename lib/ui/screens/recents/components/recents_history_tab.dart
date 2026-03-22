@@ -21,7 +21,7 @@ class RecentsHistoryTab extends ConsumerWidget {
             return ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               children: const [
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 EmptyStateView(
                   icon: Icons.history,
                   message: 'No watch history',

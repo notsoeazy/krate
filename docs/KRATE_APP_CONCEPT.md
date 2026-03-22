@@ -23,6 +23,21 @@ User ──► Riverpod Providers ──► Services ──► SQLite DB (cache)
 
 ---
 
+## Appearance & Theming
+
+Krate follows **Material 3 principles** and provides an extensive appearance customization system:
+
+- **Theme Mode**: Users can switch between Light, Dark, or System mode via `themeModeProvider`.
+- **Dynamic Color Schemes**: The app supports multiple seed-based and manual color palettes (`themeSchemeProvider`).
+  - *Seeded*: Default (Blueish), Midnight (Indigo), Forest (Green), Crimson (Red), Sunset (Amber), Rose (Pink).
+  - *Manual*: Monochrome (True grayscale).
+- **UI Polish**: 
+  - **Scroll Contrast**: AppBars automatically transition to a `surfaceContainer` background when content scrolls beneath them.
+  - **Backdrop Integration**: In `MediaDetailsScreen`, AppBars dynamically transition icon colors from White (on backdrop) to theme-onSurface (collapsed).
+  - **Search Bar**: Lighter elevation (1.0) and Material 3 `SearchBar` integration.
+
+---
+
 ## Vault Directory Structure
 
 The vault lives inside a user-selected root folder (persisted via `SharedPreferences`):

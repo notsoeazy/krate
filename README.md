@@ -39,6 +39,8 @@ The application is built for portability, allowing you to plug in media "pods" a
 - **Media Management**: Tools to link, replace, (re)sync, and delete media files.
 - **Vault Sync**: Reconcile your library with the filesystem in one tap.
 - **History & Progress**: Track your viewing history and completed titles.
+- **Appearance Customization**: Deep Material 3 theming with multiple color palettes (Midnight, Forest, Crimson, Sunset, Rose, Monochrome).
+- **UI Polish**: Lighter search shadows, smooth app bar transitions, and scroll-under contrast.
 
 ---
 
@@ -65,7 +67,7 @@ To run Krate locally, ensure you have the [Flutter SDK](https://docs.flutter.dev
 
 <h2 align="center">✦ Status ✦</h2>
 
-> **Current Version:** v0.3.0-alpha  
+> **Current Version:** v0.4.0-alpha  
 > **Platform Support:** Exclusively developed and tested for **Android**. Other platforms (Linux, Windows) are currently not functional or supported, though support for these is planned for the future.
 > 
 > Krate is currently in active development. Core features for library management and playback are implemented, with further refinements planned for the beta release.
