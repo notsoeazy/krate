@@ -61,8 +61,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: build/app/outputs/flutter-apk/krate_${{ env.CLEAN_VERSION }}.apk
-          tag_name: v${{ env.VERSION }}
-          name: Krate v${{ env.VERSION }}
+          tag_name: v${{ env.CLEAN_VERSION }}
+          name: Krate v${{ env.CLEAN_VERSION }}
           draft: false
           prerelease: true
           generate_release_notes: true

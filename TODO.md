@@ -10,7 +10,7 @@
 - [ ] Publish first alpha release (v0.4.0)
 
 ### How to Release:
-1.  **Prep Secrets**: Ensure GitHub Secret `ENV_CONTENT` is set.
+1.  **Prep Secrets**: Ensure GitHub Secret `TMDB_API_KEY` is set.
 2.  **Bump Version**: Update `version` in `pubspec.yaml` (e.g., `0.4.0+1`).
 3.  **Tag Release**: `git tag v0.4.0 && git push origin v0.4.0`.
 4.  **Manual Trigger**: Go to Actions -> Release APK -> Run workflow -> Enter version.
