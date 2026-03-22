@@ -4,6 +4,16 @@
 
 1.  **Import Rework**: Auto-search by filename and dedicated import screen.
 
+## 🚀 Release & Versioning
+
+- [x] Setup GitHub Actions for automated APK releases
+- [ ] Publish first alpha release (v0.4.0)
+
+### How to Release:
+1.  **Bump Version**: Update `version` in `pubspec.yaml` (e.g., `0.4.0+1`).
+2.  **Tag Release**: Push a git tag (e.g., `git tag v0.4.0 && git push origin v0.4.0`).
+3.  **Manual Release**: Go to GitHub Actions -> "Release APK" -> "Run workflow" -> Enter version.
+
 ## Phase 1: Core Localization & Stabilization 🛠️
 
 _Goal: Ensure the library is robust, portable, and correctly captures all metadata._

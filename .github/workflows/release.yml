@@ -1,0 +1,71 @@
+name: Release APK
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger on tags like v1.0.0, v0.4.0-alpha, etc.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (optional, defaults to pubspec.yaml)'
+        required: false
+
+permissions:
+  contents: write # Needed to create a release
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Prepare APK Asset
+        run: |
+          # Get version from input if provided (manual trigger), otherwise from pubspec.yaml
+          VERSION="${{ github.event.inputs.version }}"
+          if [ -z "$VERSION" ]; then
+            VERSION=$(grep 'version: ' pubspec.yaml | sed 's/version: //')
+          fi
+          
+          # Clean version string (remove everything after + for filenames)
+          CLEAN_VERSION=$(echo $VERSION | cut -d'+' -f1)
+          
+          # Rename for final release
+          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/krate_${CLEAN_VERSION}.apk
+          
+          # Export to environment for next steps
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "CLEAN_VERSION=${CLEAN_VERSION}" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/app/outputs/flutter-apk/krate_${{ env.CLEAN_VERSION }}.apk
+          tag_name: v${{ env.VERSION }}
+          name: Release v${{ env.VERSION }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
